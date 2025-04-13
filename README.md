@@ -17,7 +17,7 @@
 - **AI Developer – Maciej Paliszewski**  
   Integrates AI models (e.g., OpenAI GPT-3) to generate personalized recipes based on user-provided ingredients.
 
-- **DevOps / Fullstack Developer – Kacper Rogowski**  
+- **DevOps / Fullstack Developer – Kacper Rogowski - Project Manager**  
   Handles deployment, CI/CD configuration, containerization, and cloud hosting (e.g., Heroku, AWS). Maintains documentation and implements testing for application stability.
 
 ---
