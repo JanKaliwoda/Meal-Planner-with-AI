@@ -4,11 +4,11 @@ FROM node:22.11
 WORKDIR /frontend
 
 # Copy only package.json and package-lock.json first
-# COPY ./frontend/package.json .
-# COPY ./frontend/package-lock.json .
+COPY ./frontend/package.json .
+COPY ./frontend/package-lock.json .
 
 # Install dependencies
-# RUN npm install
+RUN npm ci
 
 # Now copy the rest of your frontend code
 COPY ./frontend .
@@ -17,4 +17,4 @@ COPY ./frontend .
 # EXPOSE 3000
 
 # Start the app
-CMD ["npm", "run", "build"]
+CMD ["npm", "run", "dev"]
