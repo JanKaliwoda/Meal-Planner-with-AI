@@ -1,66 +1,103 @@
+from django.contrib.auth.models import User
 from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from core.models import User, Ingredient, Recipe, MealPlan, ShoppingList
+from core.models import (
+    DietaryPreference,
+    Allergy,
+    UserProfile,
+    Ingredient,
+    Recipe,
+    Meal,
+    ShoppingList,
+    ShoppingListItem
+)
 
-User = get_user_model()
+
+class DietaryPreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DietaryPreference
+        fields = ["id", "name"]
+
+
+class AllergySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Allergy
+        fields = ["id", "name"]
 
 class UserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
-
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'password', 'dietary_restrictions']
+        fields = ["id", "username", "password"]
+        extra_kwargs = {"password": {"write_only": True}}
 
     def create(self, validated_data):
-        user = User.objects.create_user(
-            email=validated_data['email'],
-            username=validated_data['username'],
-            password=validated_data['password'],
-        )
-        user.dietary_restrictions = validated_data.get('dietary_restrictions', '')
-        user.save()
-        return user
+        return User.objects.create_user(**validated_data)
+    
+class UserProfileSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    dietary_preferences = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=DietaryPreference.objects.all(), required=False
+    )
+    allergies = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Allergy.objects.all(), required=False
+    )
 
-    def update(self, instance, validated_data):
-        if 'password' in validated_data:
-            instance.set_password(validated_data.pop('password'))
-        return super().update(instance, validated_data)
+    class Meta:
+        model = UserProfile
+        fields = ["id", "user", "dietary_preferences", "allergies"]
 
-class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField()
+
 
 class IngredientSerializer(serializers.ModelSerializer):
+    user = serializers.ReadOnlyField(source='user.username')
+
     class Meta:
         model = Ingredient
-        fields = ['id', 'name', 'quantity']
+        fields = ["id", "name", "quantity", "is_available", "user"]
+
 
 class RecipeSerializer(serializers.ModelSerializer):
-    ingredients = IngredientSerializer(many=True, read_only=True)
-    ingredient_ids = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=Ingredient.objects.all(), write_only=True, source='ingredients'
+    ingredients = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Ingredient.objects.all()
     )
+    created_by = serializers.ReadOnlyField(source='created_by.username')
 
     class Meta:
         model = Recipe
-        fields = ['id', 'title', 'description', 'ingredients', 'ingredient_ids']
+        fields = ["id", "name", "description", "steps", "ingredients", "created_by", "created_by_ai"]
 
-class MealPlanSerializer(serializers.ModelSerializer):
-    recipes = RecipeSerializer(many=True, read_only=True)
-    recipe_ids = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=Recipe.objects.all(), write_only=True, source='recipes'
+
+class MealSerializer(serializers.ModelSerializer):
+    user = serializers.ReadOnlyField(source='user.username')
+    recipe = RecipeSerializer(read_only=True)
+    recipe_id = serializers.PrimaryKeyRelatedField(
+        queryset=Recipe.objects.all(),
+        source='recipe',
+        write_only=True
     )
 
     class Meta:
-        model = MealPlan
-        fields = ['id', 'date', 'recipes', 'recipe_ids']
+        model = Meal
+        fields = ["id", "user", "date", "meal_type", "recipe", "recipe_id"]
+
+
+class ShoppingListItemSerializer(serializers.ModelSerializer):
+    ingredient = IngredientSerializer(read_only=True)
+    ingredient_id = serializers.PrimaryKeyRelatedField(
+        queryset=Ingredient.objects.all(),
+        source='ingredient',
+        write_only=True
+    )
+
+    class Meta:
+        model = ShoppingListItem
+        fields = ["id", "shopping_list", "ingredient", "ingredient_id", "quantity"]
+
 
 class ShoppingListSerializer(serializers.ModelSerializer):
-    ingredients = IngredientSerializer(many=True, read_only=True)
-    ingredient_ids = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=Ingredient.objects.all(), write_only=True, source='ingredients'
-    )
+    user = serializers.ReadOnlyField(source='user.username')
+    items = ShoppingListItemSerializer(source='shoppinglistitem_set', many=True, read_only=True)
 
     class Meta:
         model = ShoppingList
-        fields = ['id', 'name', 'ingredients', 'ingredient_ids']
+        fields = ["id", "user", "created_at", "items"]

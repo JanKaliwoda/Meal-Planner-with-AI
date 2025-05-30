@@ -1,39 +1,37 @@
-"""
-URL configuration for app project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path, include
+
 from rest_framework.routers import DefaultRouter
-from app.views import (
-    UserViewSet, IngredientViewSet, RecipeViewSet,
-    MealPlanViewSet, ShoppingListViewSet
-)
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from app.views import hello_world, CreateUserView
+from app.views import (
+    DietaryPreferenceViewSet,
+    AllergyViewSet,
+    UserProfileViewSet,
+    IngredientViewSet,
+    RecipeViewSet,
+    MealViewSet,
+    ShoppingListViewSet,
+    ShoppingListItemViewSet
+)
 
 router = DefaultRouter()
-router.register(r'users', UserViewSet, basename="user")
-router.register(r'ingredients', IngredientViewSet, basename="ingredient")
-router.register(r'recipes', RecipeViewSet, basename="recipe")
-router.register(r'mealplans', MealPlanViewSet, basename="mealplan")
-router.register(r'shoppinglists', ShoppingListViewSet, basename="shoppinglist")
+router.register('dietary-preferences', DietaryPreferenceViewSet, basename='dietary-preference')
+router.register('allergies', AllergyViewSet, basename='allergy')
+router.register('user-profiles', UserProfileViewSet, basename='user-profile')
+router.register('ingredients', IngredientViewSet, basename='ingredient')
+router.register('recipes', RecipeViewSet, basename='recipe')
+router.register('meals', MealViewSet, basename='meal')
+router.register('shopping-lists', ShoppingListViewSet, basename='shopping-list')
+router.register('shopping-list-items', ShoppingListItemViewSet, basename='shopping-list-item')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path("api/token/", TokenObtainPairView.as_view(), name="get_token"),
-    path("api/token/refresh/", TokenRefreshView.as_view(), name="refresh"),
-    path("api/", include(router.urls)),
-    path("api-auth/", include("rest_framework.urls")),
+    path('api/hello-world/', hello_world),
+    path('api/user/register/', CreateUserView.as_view(), name='register'),
+    path('api/token/', TokenObtainPairView.as_view(), name='get_token'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='refresh'),
+    path('api-auth/', include('rest_framework.urls')),
+    
+    path('api/', include(router.urls)),
 ]
