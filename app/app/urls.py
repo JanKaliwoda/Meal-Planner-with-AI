@@ -12,7 +12,10 @@ from app.views import (
     RecipeViewSet,
     MealViewSet,
     ShoppingListViewSet,
-    ShoppingListItemViewSet
+    ShoppingListItemViewSet,
+    MealStatsView,
+    GlobalIngredientSearchView,
+    matching_recipes
 )
 
 router = DefaultRouter()
@@ -34,4 +37,7 @@ urlpatterns = [
     path('api-auth/', include('rest_framework.urls')),
     
     path('api/', include(router.urls)),
+    path("api/stats/summary/", MealStatsView.as_view(), name="meal-stats"),
+    path("api/ingredient-search/", GlobalIngredientSearchView.as_view(), name="ingredient-search"),
+    path("api/matching-recipes/", matching_recipes, name="matching-recipes"),
 ]
