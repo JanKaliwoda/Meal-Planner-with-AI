@@ -34,13 +34,6 @@ from .serializers import (
     ShoppingListItemSerializer,
 )
 
-
-#  Basic Hello World
-@api_view(['GET'])
-def hello_world(request):
-    return Response({'message': f'Hello world: {datetime.now().isoformat()}'})
-
-
 #  User Registration
 class CreateUserView(generics.CreateAPIView):
     queryset = User.objects.all()

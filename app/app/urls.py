@@ -30,7 +30,6 @@ router.register('shopping-list-items', ShoppingListItemViewSet, basename='shoppi
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/hello-world/', hello_world),
     path('api/user/register/', CreateUserView.as_view(), name='register'),
     path('api/token/', TokenObtainPairView.as_view(), name='get_token'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='refresh'),
