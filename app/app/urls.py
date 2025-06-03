@@ -3,7 +3,7 @@ from django.urls import path, include
 
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from app.views import hello_world, CreateUserView
+from app.views import CreateUserView
 from app.views import (
     DietaryPreferenceViewSet,
     AllergyViewSet,
@@ -39,4 +39,8 @@ urlpatterns = [
     path("api/stats/summary/", MealStatsView.as_view(), name="meal-stats"),
     path("api/ingredient-search/", GlobalIngredientSearchView.as_view(), name="ingredient-search"),
     path("api/matching-recipes/", matching_recipes, name="matching-recipes"),
+
+    path("api/auth/", include("dj_rest_auth.urls")),
+    path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
+    path("api/auth/social/", include("allauth.socialaccount.urls")),
 ]

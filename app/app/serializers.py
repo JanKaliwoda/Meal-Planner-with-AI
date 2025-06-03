@@ -26,7 +26,7 @@ class AllergySerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "username", "password"]
+        fields = ["id", "username", "email", "first_name", "last_name"]
         extra_kwargs = {"password": {"write_only": True}}
 
     def create(self, validated_data):
@@ -44,6 +44,29 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ["id", "user", "dietary_preferences", "allergies"]
+
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password2 = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ["id", "username", "email", "first_name", "last_name", "password", "password2"]
+        extra_kwargs = {
+            "password": {"write_only": True},
+        }
+
+    def validate(self, data):
+        if data["password"] != data["password2"]:
+            raise serializers.ValidationError({"password": "Passwords do not match"})
+        return data
+
+    def create(self, validated_data):
+        validated_data.pop("password2")
+        user = User.objects.create_user(**validated_data)
+        UserProfile.objects.create(user=user)
+        return user
 
 
 

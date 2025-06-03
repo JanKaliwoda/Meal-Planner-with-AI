@@ -4,3 +4,5 @@ psycopg[c]==3.2.3
 django-cors-headers==4.6.0
 djangorestframework-simplejwt
 django-filter>=24.1,<25.0
+dj-rest-auth[with_social]>=2.2.5,<3.0
+django-allauth>=0.50.0,<0.53.0 
