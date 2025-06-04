@@ -23,31 +23,9 @@ class AllergySerializer(serializers.ModelSerializer):
         model = Allergy
         fields = ["id", "name"]
 
+
+
 class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ["id", "username", "email", "first_name", "last_name"]
-        extra_kwargs = {"password": {"write_only": True}}
-
-    def create(self, validated_data):
-        return User.objects.create_user(**validated_data)
-    
-class UserProfileSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    dietary_preferences = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=DietaryPreference.objects.all(), required=False
-    )
-    allergies = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=Allergy.objects.all(), required=False
-    )
-
-    class Meta:
-        model = UserProfile
-        fields = ["id", "user", "dietary_preferences", "allergies"]
-
-
-
-class RegisterSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
 
     class Meta:
@@ -64,9 +42,26 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("password2")
-        user = User.objects.create_user(**validated_data)
+        password = validated_data.pop("password")
+        user = User.objects.create_user(password=password, **validated_data)
+        user.is_active = True  # ✅ Ensure active
+        user.save()
         UserProfile.objects.create(user=user)
         return user
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    dietary_preferences = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=DietaryPreference.objects.all(), required=False
+    )
+    allergies = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Allergy.objects.all(), required=False
+    )
+
+    class Meta:
+        model = UserProfile
+        fields = ["id", "user", "dietary_preferences", "allergies"]
 
 
 

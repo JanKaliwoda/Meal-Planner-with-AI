@@ -7,6 +7,9 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
 from django.db.models import Count
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from django_filters import rest_framework as dj_filters
 from django_filters.rest_framework import DjangoFilterBackend
@@ -176,3 +179,44 @@ def matching_recipes(request):
     user_ingredients = request.user.ingredients.filter(is_available=True).values_list('name', flat=True)
     matching = Recipe.objects.filter(ingredients__name__in=user_ingredients).distinct()
     return Response(RecipeSerializer(matching, many=True).data)
+
+class GoogleLoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        token = request.data.get("token")
+        if not token:
+            return Response({"error": "Token is required"}, status=400)
+
+        try:
+            idinfo = id_token.verify_oauth2_token(token, google_requests.Request())
+            email = idinfo["email"]
+            first_name = idinfo.get("given_name", "")
+            last_name = idinfo.get("family_name", "")
+            username = f"{first_name}_{last_name}".lower()
+
+            user, created = User.objects.get_or_create(email=email, defaults={
+                "first_name": first_name,
+                "last_name": last_name,
+                "username": username,
+            })
+
+            if created:
+                UserProfile.objects.create(user=user)
+
+            refresh = RefreshToken.for_user(user)
+
+            return Response({
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "username": user.username,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                }
+            })
+
+        except ValueError:
+            return Response({"error": "Invalid token"}, status=400)
