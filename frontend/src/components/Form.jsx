@@ -6,6 +6,8 @@ import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
 import "../styles/Form.css";
 
 function Form({ route, method }) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +36,8 @@ function Form({ route, method }) {
           email,
           password: password,
           password2: password2,
+          first_name: firstName,
+          last_name: lastName,
         };
       }
 
@@ -57,7 +61,24 @@ function Form({ route, method }) {
   return (
     <form onSubmit={handleSubmit} className="form-container">
       <h1>{name}</h1>
-
+      {method === "register" && (
+        <>
+          <input
+            className="form-input"
+            type="text"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            placeholder="First Name"
+          />
+          <input
+            className="form-input"
+            type="text"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            placeholder="Last Name"
+          />
+        </>
+      )}
       <input
         className="form-input"
         type="text"
