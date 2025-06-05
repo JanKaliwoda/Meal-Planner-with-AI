@@ -17,6 +17,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from core.models import (
     DietaryPreference,
     Allergy,
+    IngredientAllData,
     UserProfile,
     Ingredient,
     Recipe,
@@ -26,6 +27,7 @@ from core.models import (
 )
 
 from .serializers import (
+    IngredientAllDataSerializer,
     UserSerializer,
     DietaryPreferenceSerializer,
     AllergySerializer,
@@ -82,6 +84,12 @@ class IngredientViewSet(viewsets.ModelViewSet):
         ingredient.is_available = not ingredient.is_available
         ingredient.save()
         return Response({"status": "updated", "is_available": ingredient.is_available})
+    
+#  Ingredient All Data (for global search)
+class IngredientAllDataViewSet(viewsets.ModelViewSet):
+    queryset = IngredientAllData.objects.all()
+    serializer_class = IngredientAllDataSerializer
+    permission_classes = [IsAuthenticated]
 
 
 #  Recipes

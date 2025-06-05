@@ -8,7 +8,8 @@ from core.models import (
     Recipe,
     Meal,
     ShoppingList,
-    ShoppingListItem
+    ShoppingListItem,
+    IngredientAllData
 )
 
 
@@ -71,6 +72,11 @@ class IngredientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ingredient
         fields = ["id", "name", "quantity", "is_available", "user"]
+
+class IngredientAllDataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IngredientAllData
+        fields = ["id", "name"]
 
 
 class RecipeSerializer(serializers.ModelSerializer):

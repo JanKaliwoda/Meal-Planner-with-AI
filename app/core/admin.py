@@ -22,6 +22,12 @@ class IngredientAdmin(admin.ModelAdmin):
     list_filter = ["is_available"]
     search_fields = ["name", "user__username"]
 
+@admin.register(models.IngredientAllData)
+class IngredientAllDataAdmin(admin.ModelAdmin):
+    list_display = ["name"]
+    search_fields = ["name"]
+    ordering = ["name"]
+
 @admin.register(models.Recipe)
 class RecipeAdmin(admin.ModelAdmin):
     list_display = ["name", "created_by", "created_by_ai"]

@@ -35,12 +35,18 @@ class Ingredient(models.Model):
     def __str__(self):
         return f"{self.name} ({self.quantity})"
     
+class IngredientAllData(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+    
 class Recipe(models.Model):
     """Represents a recipe in the system"""
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     steps = models.TextField()
-    ingredients = models.ManyToManyField('Ingredient')  
+    ingredients = models.ManyToManyField('IngredientAllData')  
     created_by_ai = models.BooleanField(default=False)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
 

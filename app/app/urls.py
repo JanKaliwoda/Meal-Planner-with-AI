@@ -15,6 +15,7 @@ from app.views import (
     ShoppingListViewSet,
     ShoppingListItemViewSet,
     MealStatsView,
+    IngredientAllDataViewSet,
     GlobalIngredientSearchView,
     matching_recipes
 )
@@ -28,6 +29,7 @@ router.register('recipes', RecipeViewSet, basename='recipe')
 router.register('meals', MealViewSet, basename='meal')
 router.register('shopping-lists', ShoppingListViewSet, basename='shopping-list')
 router.register('shopping-list-items', ShoppingListItemViewSet, basename='shopping-list-item')
+router.register('ingredient-all-data', IngredientAllDataViewSet, basename='ingredient-all-data')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
