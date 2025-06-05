@@ -1,4 +1,6 @@
 from datetime import datetime
+import sys
+import os
 
 from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.response import Response
@@ -13,6 +15,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from django_filters import rest_framework as dj_filters
 from django_filters.rest_framework import DjangoFilterBackend
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../resources'))
+from actual_ai import find_recipes_by_ingredients
 
 from core.models import (
     DietaryPreference,
@@ -228,3 +233,16 @@ class GoogleLoginView(APIView):
 
         except ValueError:
             return Response({"error": "Invalid token"}, status=400)
+
+
+# AI Recipe Search based on ingredients
+class AIRecipeSearchView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        ingredients = request.data.get("ingredients", [])
+        if not ingredients or not isinstance(ingredients, list):
+            return Response({"error": "A list of ingredients is required."}, status=400)
+        recipe_titles = find_recipes_by_ingredients(ingredients)
+        recipes = Recipe.objects.filter(name__in=recipe_titles)
+        return Response(RecipeSerializer(recipes, many=True).data)

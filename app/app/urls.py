@@ -17,6 +17,7 @@ from app.views import (
     MealStatsView,
     IngredientAllDataViewSet,
     GlobalIngredientSearchView,
+    AIRecipeSearchView,
     matching_recipes
 )
 
@@ -42,6 +43,8 @@ urlpatterns = [
     path("api/stats/summary/", MealStatsView.as_view(), name="meal-stats"),
     path("api/ingredient-search/", GlobalIngredientSearchView.as_view(), name="ingredient-search"),
     path("api/matching-recipes/", matching_recipes, name="matching-recipes"),
+
+    path('api/ai-recipe-search/', AIRecipeSearchView.as_view(), name='ai-recipe-search'),
 
     path("api/user/google-login/", GoogleLoginView.as_view(), name="google-login"),
 ]
