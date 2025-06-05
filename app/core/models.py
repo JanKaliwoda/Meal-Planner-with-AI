@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class DietaryPreference(models.Model):
@@ -12,7 +14,6 @@ class DietaryPreference(models.Model):
 class Allergy(models.Model):
     """Known allergies a user might have"""
     name = models.CharField(max_length=100)
-
     def __str__(self):
         return self.name
     
@@ -24,7 +25,7 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username} Profile"
-    
+
 class Ingredient(models.Model):
     """Available or needed ingredient"""
     name = models.CharField(max_length=100)
