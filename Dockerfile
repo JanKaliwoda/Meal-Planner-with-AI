@@ -16,7 +16,6 @@ RUN apt-get update && apt-get install -y \
 
 # RUN apk update && apk add --no-cache bash postgresql-dev gcc musl-dev
 
-RUN pip install --no-cache-dir "numpy>=1.26,<2.0"
 RUN pip install --no-cache-dir -r requirements.txt
 
 # COPY scripts/wait-for-it.sh /wait-for-it.sh
