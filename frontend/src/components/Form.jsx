@@ -5,7 +5,7 @@ import api from "../api";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
 import "../styles/Form.css";
 
-function Form({ route, method }) {
+function Form({ route, method, onLogin }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
@@ -18,45 +18,47 @@ function Form({ route, method }) {
   const name = method === "login" ? "Login" : "Register";
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      let payload;
+  try {
+    let payload;
 
-      if (method === "login") {
-        payload = { username, password };
-      } else {
-        if (password !== password2) {
-          alert("Passwords do not match");
-          return;
-        }
-        payload = {
-          username,
-          email,
-          password: password,
-          password2: password2,
-          first_name: firstName,
-          last_name: lastName,
-        };
+    if (method === "login") {
+      payload = { username, password };
+    } else {
+      if (password !== password2) {
+        alert("Passwords do not match");
+        setLoading(false);
+        return;
       }
-
-      const res = await api.post(route, payload);
-
-      if (method === "login") {
-        localStorage.setItem(ACCESS_TOKEN, res.data.access);
-        localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
-        navigate("/");
-      } else {
-        navigate("/login");
-      }
-    } catch (error) {
-      console.error("Form error:", error);
-      alert("Error: " + (error.response?.data?.detail || "Something went wrong"));
-    } finally {
-      setLoading(false);
+      payload = {
+        username,
+        email,
+        password: password,
+        password2: password2,
+        first_name: firstName,
+        last_name: lastName,
+      };
     }
-  };
+
+    const res = await api.post(route, payload);
+
+    if (method === "login") {
+      localStorage.setItem(ACCESS_TOKEN, res.data.access);
+      localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
+      if (onLogin) await onLogin(); // <-- Call the callback here
+      navigate("/");
+    } else {
+      navigate("/login");
+    }
+  } catch (error) {
+    console.error("Form error:", error);
+    alert("Error: " + (error.response?.data?.detail || "Something went wrong"));
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <form onSubmit={handleSubmit} className="form-container">

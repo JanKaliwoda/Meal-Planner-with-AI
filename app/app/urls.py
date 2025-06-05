@@ -9,6 +9,8 @@ from app.views import (
     DietaryPreferenceViewSet,
     AllergyViewSet,
     UserProfileViewSet,
+    CurrentUserView,
+    ChangePasswordView,
     IngredientViewSet,
     RecipeViewSet,
     MealViewSet,
@@ -34,6 +36,8 @@ router.register('ingredient-all-data', IngredientAllDataViewSet, basename='ingre
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/user/register/', CreateUserView.as_view(), name='register'),
+    path('api/user/profile/', CurrentUserView.as_view(), name='current-user'),
+    path('api/user/change-password/', ChangePasswordView.as_view(), name='change-password'),
     path('api/token/', TokenObtainPairView.as_view(), name='get_token'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='refresh'),
     path('api-auth/', include('rest_framework.urls')),

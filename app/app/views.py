@@ -14,6 +14,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django_filters import rest_framework as dj_filters
 from django_filters.rest_framework import DjangoFilterBackend
 
+from .serializers import UserSerializer
+from rest_framework import status
+
 from core.models import (
     DietaryPreference,
     Allergy,
@@ -45,6 +48,40 @@ class CreateUserView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [AllowAny]
 
+#  User Profile Management
+class CurrentUserView(generics.RetrieveUpdateAPIView):
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.method in ["PATCH", "PUT"]:
+            from .serializers import UserUpdateSerializer
+            return UserUpdateSerializer
+        from .serializers import UserSerializer
+        return UserSerializer
+
+    def get_object(self):
+        return self.request.user
+    
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        old_password = request.data.get("old_password")
+        new_password = request.data.get("new_password")
+        new_password2 = request.data.get("new_password2")
+
+        if not user.check_password(old_password):
+            return Response({"detail": "Old password is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+        if new_password != new_password2:
+            return Response({"detail": "New passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(new_password) < 8:
+            return Response({"detail": "Password must be at least 8 characters."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({"detail": "Password changed successfully."}, status=status.HTTP_200_OK)
 
 #  Dietary Preferences
 class DietaryPreferenceViewSet(viewsets.ModelViewSet):

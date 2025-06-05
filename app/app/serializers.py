@@ -50,6 +50,11 @@ class UserSerializer(serializers.ModelSerializer):
         UserProfile.objects.create(user=user)
         return user
 
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "username", "email", "first_name", "last_name"]
+        read_only_fields = ["id", "username"]
 
 class UserProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
