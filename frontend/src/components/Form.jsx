@@ -1,28 +1,30 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { GoogleLogin } from "@react-oauth/google"; // 👈 Google login
-import api from "../api";
-import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
-import "../styles/Form.css";
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { GoogleLogin } from "@react-oauth/google" // 👈 Google login
+import api from "../api"
+import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants"
+import "../styles/index.css"
 
 function Form({ route, method, onLogin }) {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [password2, setPassword2] = useState("");
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+	const [firstName, setFirstName] = useState("")
+	const [lastName, setLastName] = useState("")
+	const [username, setUsername] = useState("")
+	const [email, setEmail] = useState("")
+	const [password, setPassword] = useState("")
+	const [password2, setPassword2] = useState("")
+	const [loading, setLoading] = useState(false)
+	const navigate = useNavigate()
 
-  const name = method === "login" ? "Login" : "Register";
+	const name = method === "login" ? "Login" : "Register"
 
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+	// Handle form submission
 
-  try {
-    let payload;
+	const handleSubmit = async (e) => {
+		e.preventDefault()
+		setLoading(true)
+
+		try {
+			let payload
 
     if (method === "login") {
       payload = { username, password };
@@ -42,7 +44,7 @@ function Form({ route, method, onLogin }) {
       };
     }
 
-    const res = await api.post(route, payload);
+			const res = await api.post(route, payload)
 
     if (method === "login") {
       localStorage.setItem(ACCESS_TOKEN, res.data.access);
@@ -60,92 +62,99 @@ function Form({ route, method, onLogin }) {
   }
 };
 
-  return (
-    <form onSubmit={handleSubmit} className="form-container">
-      <h1>{name}</h1>
-      {method === "register" && (
-        <>
-          <input
-            className="form-input"
-            type="text"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            placeholder="First Name"
-          />
-          <input
-            className="form-input"
-            type="text"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            placeholder="Last Name"
-          />
-        </>
-      )}
-      <input
-        className="form-input"
-        type="text"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        placeholder="Username"
-      />
+	return (
+		<div className="min-h-screen flex items-center justify-center">
+			<form onSubmit={handleSubmit}>
+				<fieldset className="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4">
+					<legend className="fieldset-legend">{name}</legend>
 
-      {method === "register" && (
-        <input
-          className="form-input"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-        />
-      )}
+					{/* If register, show email field */}
 
-      <input
-        className="form-input"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Password"
-      />
+					{method === "register" && (
+						<>
+							<label className="label">Email</label>
+							<input
+								type="email"
+								value={email}
+								onChange={(e) => setEmail(e.target.value)}
+								placeholder="Email"
+								className="input"
+							/>
+						</>
+					)}
 
-      {method === "register" && (
-        <input
-          className="form-input"
-          type="password"
-          value={password2}
-          onChange={(e) => setPassword2(e.target.value)}
-          placeholder="Confirm Password"
-        />
-      )}
+					{/* Show Username and password fields */}
 
-      <button className="form-button" type="submit" disabled={loading}>
-        {loading ? "Please wait..." : name}
-      </button>
+					<label className="label">Username</label>
+					<input
+						type="text"
+						value={username}
+						onChange={(e) => setUsername(e.target.value)}
+						placeholder="Username"
+						className="input"
+					/>
 
-      {method === "login" && (
-        <div style={{ marginTop: "20px" }}>
-          <GoogleLogin
-            onSuccess={async (credentialResponse) => {
-              try {
-                const res = await api.post("/api/user/google-login/", {
-                  token: credentialResponse.credential,
-                });
+					<label className="label">Password</label>
+					<input
+						type="password"
+						value={password}
+						onChange={(e) => setPassword(e.target.value)}
+						placeholder="Password"
+						className="input"
+					/>
 
-                localStorage.setItem(ACCESS_TOKEN, res.data.access);
-                localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
-                navigate("/");
-              } catch (err) {
-                console.error("Google login error", err);
-                alert("Google login failed");
-              }
-            }}
-            onError={() => {
-              alert("Google Sign In was unsuccessful. Try again later");
-            }}
-          />
-        </div>
-      )}
-    </form>
-  );
+					{/* If register, show confirm password field */}
+
+					{method === "register" && (
+						<>
+							<label className="label">Confirm Password</label>
+							<input
+								type="password"
+								value={password2}
+								onChange={(e) => setPassword2(e.target.value)}
+								placeholder="Confirm Password"
+								className="input"
+							/>
+						</>
+					)}
+
+					{/* Button */}
+
+					<button
+						type="submit"
+						disabled={loading}
+						className="btn btn-neutral mt-4 transition duration-200 disabled:opacity-50"
+					>
+						{loading ? "Loading..." : name}
+					</button>
+
+					{/* Google login button */}
+
+					<div className="mt-4 flex justify-center">
+						<GoogleLogin
+							onSuccess={async (credentialResponse) => {
+								try {
+									const res = await api.post("/api/user/google-login/", {
+										token: credentialResponse.credential,
+									})
+
+									localStorage.setItem(ACCESS_TOKEN, res.data.access)
+									localStorage.setItem(REFRESH_TOKEN, res.data.refresh)
+									navigate("/")
+								} catch (err) {
+									console.error("Google login error", err)
+									alert("Google login failed")
+								}
+							}}
+							onError={() => {
+								alert("Google Sign In was unsuccessful. Try again later")
+							}}
+						/>
+					</div>
+				</fieldset>
+			</form>
+		</div>
+	)
 }
 
-export default Form;
+export default Form
