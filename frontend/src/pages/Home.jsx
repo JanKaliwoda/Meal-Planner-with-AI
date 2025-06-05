@@ -1,4 +1,4 @@
-import WelcomeWindow from "../components/WelcomeWindow";
+// import WelcomeWindow from "../components/WelcomeWindow";
 
 function Home() {
 	return (
