@@ -85,10 +85,7 @@ class IngredientAllDataSerializer(serializers.ModelSerializer):
 
 
 class RecipeSerializer(serializers.ModelSerializer):
-    ingredients = serializers.PrimaryKeyRelatedField(
-        many=True,
-        queryset=Ingredient.objects.all()
-    )
+    ingredients = IngredientAllDataSerializer(many=True, read_only=True)
     created_by = serializers.ReadOnlyField(source='created_by.username')
 
     class Meta:

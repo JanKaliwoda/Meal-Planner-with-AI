@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
 # RUN apk update && apk add --no-cache bash postgresql-dev gcc musl-dev
 
 RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m nltk.downloader -d /usr/local/share/nltk_data wordnet
 
 # COPY scripts/wait-for-it.sh /wait-for-it.sh
 # RUN chmod +x /wait-for-it.sh

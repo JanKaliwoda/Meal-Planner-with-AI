@@ -47,7 +47,7 @@ class Recipe(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     steps = models.TextField()
-    ingredients = models.ManyToManyField('IngredientAllData')  
+    ingredients = models.ManyToManyField('IngredientAllData', related_name='recipes')
     created_by_ai = models.BooleanField(default=False)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
 

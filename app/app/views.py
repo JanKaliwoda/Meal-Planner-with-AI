@@ -17,7 +17,7 @@ from django_filters import rest_framework as dj_filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../resources'))
-from actual_ai import find_recipes_by_ingredients
+from actual_ai import get_weighted_phrase_embedding, find_recipes_by_ingredients
 
 from .serializers import UserSerializer
 from rest_framework import status
@@ -274,12 +274,33 @@ class GoogleLoginView(APIView):
 
 # AI Recipe Search based on ingredients
 class AIRecipeSearchView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
-        ingredients = request.data.get("ingredients", [])
-        if not ingredients or not isinstance(ingredients, list):
+        ingredient_names = request.data.get("ingredients", [])
+        if not ingredient_names or not isinstance(ingredient_names, list):
             return Response({"error": "A list of ingredients is required."}, status=400)
+
+        # Ensure all ingredients exist in IngredientAllData
+        ingredients_qs = IngredientAllData.objects.filter(name__in=ingredient_names)
+        ingredients = list(ingredients_qs.values_list('name', flat=True))
+
+        if not ingredients:
+            return Response({"error": "No matching ingredients found."}, status=400)
+
+        # Use the AI function to get recipe titles
         recipe_titles = find_recipes_by_ingredients(ingredients)
-        recipes = Recipe.objects.filter(name__in=recipe_titles)
+
+        # Normalize for case-insensitive matching
+        def normalize_title(title):
+            return title.strip().lower().replace("’", "'").replace("`", "'").replace("”", '"').replace("“", '"')
+
+        recipes = Recipe.objects.none()
+        for title in recipe_titles:
+            recipes |= Recipe.objects.filter(name__iexact=title.strip())
+
+        print(f"AIRecipeSearchView: Found {recipes.count()} recipes for {ingredients}")
+        print("AI returned recipe titles:", recipe_titles)
         return Response(RecipeSerializer(recipes, many=True).data)
+    
+    
