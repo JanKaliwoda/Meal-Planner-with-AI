@@ -353,6 +353,16 @@ class AIRecipeSearchView(APIView):
             if norm_ai_title in normalized_db:
                 matched_recipes.append(normalized_db[norm_ai_title])
 
+        # Serialize recipes with ingredients and other information
+        serialized_recipes = []
+        for recipe in matched_recipes:
+            serialized_recipes.append({
+                "id": recipe.id,
+                "name": recipe.name,
+                "ingredients": list(recipe.ingredients.values_list('name', flat=True)),
+            })
+                
+
         print(f"AIRecipeSearchView: Found {len(matched_recipes)} recipes for {ingredients}")
         print("AI returned recipe titles:", recipe_titles)
         return Response(RecipeSerializer(matched_recipes, many=True).data)
