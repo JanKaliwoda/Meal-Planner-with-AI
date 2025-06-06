@@ -3,3 +3,56 @@
 @plugin "daisyui";
 @plugin "flowbite/plugin";
 @source "../node_modules/flowbite";
+
+
+@theme {
+  --color-gunmetal-100: #020a0b;
+  --color-gunmetal-200: #041316;
+  --color-gunmetal-300: #061d22;
+  --color-gunmetal-400: #08262d;
+  --color-gunmetal-500: #0a2e36;
+  --color-gunmetal-600: #186f83;
+  --color-gunmetal-700: #26afce;
+  --color-gunmetal-800: #69cde3;
+  --color-gunmetal-900: #b4e6f1;
+
+  --color-spring-green-100: #013913;
+  --color-spring-green-200: #027226;
+  --color-spring-green-300: #03ab39;
+  --color-spring-green-400: #05e44b;
+  --color-spring-green-500: #27fb6b;
+  --color-spring-green-600: #53fb88;
+  --color-spring-green-700: #7efca6;
+  --color-spring-green-800: #a9fdc4;
+  --color-spring-green-900: #d4fee1;
+
+  --color-emerald-100: #042913;
+  --color-emerald-200: #085227;
+  --color-emerald-300: #0c7b3a;
+  --color-emerald-400: #10a34d;
+  --color-emerald-500: #14cc60;
+  --color-emerald-600: #2fea7d;
+  --color-emerald-700: #63f09e;
+  --color-emerald-800: #97f5be;
+  --color-emerald-900: #cbfadf;
+
+  --color-office-green-100: #011605;
+  --color-office-green-200: #012c0a;
+  --color-office-green-300: #02420e;
+  --color-office-green-400: #025813;
+  --color-office-green-500: #036d19;
+  --color-office-green-600: #05bb29;
+  --color-office-green-700: #16f944;
+  --color-office-green-800: #64fb82;
+  --color-office-green-900: #b1fdc1;
+
+  --color-pigment-green-100: #022008;
+  --color-pigment-green-200: #044011;
+  --color-pigment-green-300: #065f19;
+  --color-pigment-green-400: #077f21;
+  --color-pigment-green-500: #09a129;
+  --color-pigment-green-600: #0de03b;
+  --color-pigment-green-700: #3df465;
+  --color-pigment-green-800: #7ef798;
+  --color-pigment-green-900: #befbcc;
+}
