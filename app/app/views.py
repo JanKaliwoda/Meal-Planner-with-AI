@@ -19,6 +19,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 sys.path.append(os.path.join(os.path.dirname(__file__), '../resources'))
 from actual_ai import get_weighted_phrase_embedding, find_recipes_by_ingredients
 
+from django.db.models import Q
 from .serializers import UserSerializer
 from rest_framework import status
 
@@ -270,7 +271,11 @@ class GoogleLoginView(APIView):
 
         except ValueError:
             return Response({"error": "Invalid token"}, status=400)
+        
 
+
+def normalize_title(title):
+    return title.strip().lower().replace("’", "'").replace("`", "'").replace("”", '"').replace("“", '"')
 
 # AI Recipe Search based on ingredients
 class AIRecipeSearchView(APIView):
@@ -291,16 +296,18 @@ class AIRecipeSearchView(APIView):
         # Use the AI function to get recipe titles
         recipe_titles = find_recipes_by_ingredients(ingredients)
 
-        # Normalize for case-insensitive matching
-        def normalize_title(title):
-            return title.strip().lower().replace("’", "'").replace("`", "'").replace("”", '"').replace("“", '"')
+        # Normalize all DB recipe names once
+        db_recipes = list(Recipe.objects.all())
+        normalized_db = {normalize_title(r.name): r for r in db_recipes}
 
-        recipes = Recipe.objects.none()
-        for title in recipe_titles:
-            recipes |= Recipe.objects.filter(name__iexact=title.strip())
+        # Find recipes by normalized title
+        matched_recipes = []
+        for ai_title in recipe_titles:
+            norm_ai_title = normalize_title(ai_title)
+            if norm_ai_title in normalized_db:
+                matched_recipes.append(normalized_db[norm_ai_title])
 
-        print(f"AIRecipeSearchView: Found {recipes.count()} recipes for {ingredients}")
+        print(f"AIRecipeSearchView: Found {len(matched_recipes)} recipes for {ingredients}")
         print("AI returned recipe titles:", recipe_titles)
-        return Response(RecipeSerializer(recipes, many=True).data)
-    
+        return Response(RecipeSerializer(matched_recipes, many=True).data)
     

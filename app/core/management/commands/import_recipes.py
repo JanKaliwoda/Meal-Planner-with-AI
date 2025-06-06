@@ -4,10 +4,10 @@ from django.core.management.base import BaseCommand
 from core.models import IngredientAllData, Recipe
 
 class Command(BaseCommand):
-    help = "Import recipes from recipes.csv"
+    help = "Import recipes from test_dataset.csv"
 
     def handle(self, *args, **kwargs):
-        with open('resources/recipes.csv', encoding='utf-8') as f:
+        with open('resources/test_dataset.csv', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
                 name = row['title'].strip()
