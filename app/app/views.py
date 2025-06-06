@@ -110,24 +110,61 @@ class UserProfileViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
-#  Ingredient Management
+#  Ingredient Management 
 class IngredientViewSet(viewsets.ModelViewSet):
     serializer_class = IngredientSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # Return only ingredients belonging to the current user ("fridge" contents)
         return Ingredient.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
+        # When creating a new ingredient, automatically assign it to the current user
         serializer.save(user=self.request.user)
 
     @action(detail=True, methods=["post"])
+    # Toggle the availability status of a specific ingredient
     def toggle_availability(self, request, pk=None):
         ingredient = self.get_object()
         ingredient.is_available = not ingredient.is_available
         ingredient.save()
         return Response({"status": "updated", "is_available": ingredient.is_available})
     
+    @action(detail=False, methods=["post"])
+    def add_from_global(self, request):
+        # Add an ingredient from the global list (IngredientAllData) to the user's fridge
+        name = request.data.get("name")
+        quantity = request.data.get("quantity", 1)
+        if not name:
+            return Response({"error": "No ingredient name provided."}, status=400)
+        try:
+            base = IngredientAllData.objects.get(name=name)
+        except IngredientAllData.DoesNotExist:
+            return Response({"error": "Ingredient does not exist."}, status=404)
+        # Get or create the ingredient for the user, and update quantity if it already exists
+        ingredient, created = Ingredient.objects.get_or_create(
+            user=request.user, name=base.name,
+            defaults={"quantity": quantity}
+        )
+        if not created:
+            ingredient.quantity += int(quantity)
+            ingredient.save()
+        return Response(IngredientSerializer(ingredient).data)
+    
+    @action(detail=True, methods=["patch"])
+    # Set a new quantity for a specific ingredient in the user's fridge
+    def set_quantity(self, request, pk=None):
+        ingredient = self.get_object()
+        quantity = request.data.get("quantity")
+        if quantity is not None:
+            ingredient.quantity = int(quantity)
+            ingredient.save()
+            return Response({"status": "updated", "quantity": ingredient.quantity})
+        return Response({"error": "No quantity provided."}, status=400)
+    
+
+
 #  Ingredient All Data (for global search)
 class IngredientAllDataViewSet(viewsets.ModelViewSet):
     queryset = IngredientAllData.objects.all()
