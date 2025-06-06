@@ -32,6 +32,7 @@ class Ingredient(models.Model):
     quantity = models.CharField(max_length=50, blank=True)  # Optional: "2 cups", etc.
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ingredients')
     is_available = models.BooleanField(default=True)
+    expiration_date = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.quantity})"
