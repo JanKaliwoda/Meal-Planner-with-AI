@@ -88,7 +88,7 @@ The application follows a three-layer architecture:
 - Stores and manages user-inputted ingredients.
 
 ### 🍽️ Recipe Generation Module
-- Uses GPT-3 to create recipes and communicates results via API.
+- Uses ~~GPT-3~~ to create recipes and communicates results via API.
 
 ---
 
