@@ -1,10 +1,17 @@
-import Logo from "../components/Logo";
+import CircularText from "../components/Logo";
+import Navbar from "../components/Navbar";
 import Searchbar from "../components/Searchbar";
 
 function Home() {
 	return (
 		<div>
-			<Logo />
+			<Navbar />
+			<CircularText
+        text="MEAL.PLANNER.WITH.AI "
+        onHover="speedUp"
+        spinDuration={20}
+        className="custom-class"
+      />
 			<Searchbar />
 			{/* <div className="flex flex-col items-center justify-center min-h-screen bg-gray-700">
 				<h1 className="text-4xl font-bold mb-4 text-gray-400">
