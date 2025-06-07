@@ -52,13 +52,19 @@ function Searchbar() {
     "potato",
   ]
 
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   const filteredIngredients = allIngredients.filter((ingredient) =>
     ingredient.toLowerCase().includes(searchInput.toLowerCase())
   )
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   // Toggle ingredient selection
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
   const toggleIngredient = (ingredient) => {
@@ -69,6 +75,7 @@ function Searchbar() {
     )
   }
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
   // Handle search button click
   const handleSearch = async (e) => {
@@ -160,6 +167,73 @@ function Searchbar() {
         ))}
 
 >>>>>>> Stashed changes
+=======
+  const handleSearch = async (e) => {
+    setHasSearched(true)
+    e.preventDefault()
+    if (selectedIngredients.length === 0) {
+      addAlert("Please select at least one ingredient!")
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await api.post("/api/ai-recipe-search/", {
+        ingredients: selectedIngredients,
+      })
+      setRecipes(response.data)
+    } catch (error) {
+      console.error("Error fetching recipes:", error)
+      alert("Failed to fetch recipes. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const addAlert = (message) => {
+    const id = Date.now()
+    setAlerts((prevAlerts) => [...prevAlerts, { id, message, visible: true }])
+
+    setTimeout(() => {
+      setAlerts((prevAlerts) =>
+        prevAlerts.map((alert) =>
+          alert.id === id ? { ...alert, visible: false } : alert
+        )
+      )
+    }, 500)
+
+    setTimeout(() => {
+      setAlerts((prevAlerts) => prevAlerts.filter((alert) => alert.id !== id))
+    }, 2500)
+  }
+
+  const openModal = (recipe) => {
+    setSelectedRecipe(recipe)
+    setIsModalOpen(true)
+  }
+
+  const closeModal = () => {
+    setSelectedRecipe(null)
+    setIsModalOpen(false)
+  }
+
+  return (
+    <div className="bg-gunmetal-500/0">
+      <div className="">
+        {/* Alerts */}
+        {alerts.map((alert) => (
+          <div
+            key={alert.id}
+            role="alert"
+            className={`alert alert-warning fixed top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 flex items-center justify-center gap-2 p-4 text-yellow-800 bg-yellow-100 border border-yellow-300 rounded-lg shadow-lg transition-opacity duration-500 ${
+              alert.visible ? "opacity-80" : "opacity-0"
+            }`}
+          >
+            <span>{alert.message}</span>
+          </div>
+        ))}
+
+>>>>>>> Stashed changes
         {/* Searchbar */}
         <form className="max-w-md mx-auto py-10">
           <label
@@ -173,6 +247,7 @@ function Searchbar() {
               type="search"
               id="default-search"
               value={searchInput}
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
               onChange={(e) => setSearchInput(e.target.value)} // Update search input state
               autoComplete="off"
@@ -207,11 +282,19 @@ function Searchbar() {
               placeholder="Search Ingredients..."
             />
 >>>>>>> Stashed changes
+=======
+              autoComplete="false"
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="block w-full p-4 ps-5 placeholder-office-green-600 text-sm text-spring-green-500 border-2 border-office-green-500 rounded-full bg-gray-50/0 focus:ring-emerald-500 focus:border-spring-green-500 [&::-webkit-search-cancel-button]:appearance-none"
+              placeholder="Search Ingredients..."
+            />
+>>>>>>> Stashed changes
           </div>
         </form>
 
         {/* Ingredient Tiles */}
         <div className="p-5">
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
           <div className="flex flex-wrap justify-center gap-4">
             {filteredIngredients.map((ingredient) => (
@@ -228,6 +311,8 @@ function Searchbar() {
               </div>
             ))}
 =======
+=======
+>>>>>>> Stashed changes
           <div className="max-w-4xl mx-auto w-full">
             <motion.div
               layout
@@ -255,11 +340,15 @@ function Searchbar() {
                 ))}
               </AnimatePresence>
             </motion.div>
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
           </div>
         </div>
 
         {/* Search Button */}
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
         <div className="flex justify-center mt-4">
           <button
@@ -360,6 +449,56 @@ function Searchbar() {
         ) : null}
       </div>
 
+=======
+        <div className="flex justify-center mt-4 px-5 mb-6">
+  <button
+    onClick={handleSearch}
+    className="w-full max-w-md px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
+  >
+    Search Recipes
+  </button>
+</div>
+      </div>
+
+      {/* Recipe Tiles */}
+      <div className="p-5 pb-100">
+        {loading ? (
+          <div className="flex justify-center items-center">
+            <span className="loading loading-dots loading-xl"></span>
+          </div>
+        ) : recipes.length > 0 ? (
+          <div className="flex flex-wrap justify-center gap-6">
+            {recipes.map((recipe) => (
+              <SpotlightCard
+                key={recipe.id}
+                className="custom-spotlight-card"
+                spotlightColor="rgba(0, 229, 255, 0.2)"
+              >
+                <div
+                  className="bg-gunmetal-300 border-2 border-office-green-500 rounded-lg p-4 max-w-xs cursor-pointer hover:bg-emerald-500/20 transition-colors"
+                  onClick={() => openModal(recipe)}
+                >
+                  <h3 className="text-lg font-bold text-spring-green-400 mb-2">
+                    {recipe.name}
+                  </h3>
+                  <p className="text-white mb-4 truncate">
+                    Ingredients:{" "}
+                    {recipe.ingredients
+                      .map((ingredient) => ingredient.name)
+                      .join(", ")}
+                  </p>
+                </div>
+              </SpotlightCard>
+            ))}
+          </div>
+        ) : hasSearched ? (
+          <p className="text-spring-green-400 text-center">
+            No recipes found. Try selecting different ingredients.
+          </p>
+        ) : null}
+      </div>
+
+>>>>>>> Stashed changes
       {/* Recipe Modal */}
       {isModalOpen && selectedRecipe && (
         <div
@@ -397,6 +536,9 @@ function Searchbar() {
           </SpotlightCard>
         </div>
       )}
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     </div>
   )
