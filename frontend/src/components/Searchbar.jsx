@@ -1,173 +1,176 @@
 {
-	/* <script src="frontend\node_modules\flowbite\dist\flowbite.min.js"></script> */
+  /* <script src="frontend\node_modules\flowbite\dist\flowbite.min.js"></script> */
 }
-import React from "react";
-import { useState } from "react";
-import api from "../api"; // Adjust the import path as necessary
-import "../assets/layered-waves-haikei.svg"; // Ensure this path is correct
+import React from "react"
+import { useState } from "react"
+import api from "../api" // Adjust the import path as necessary
+import "../assets/layered-waves-haikei.svg" // Ensure this path is correct
 import ScrollVelocity from "./ScrollVelocity"
 
 function Searchbar() {
-	const [searchInput, setSearchInput] = useState("") // State for search input
-	const [selectedIngredients, setSelectedIngredients] = useState([]) // State for selected ingredients
-	const [recipes, setRecipes] = useState([]) // State for fetched recipes
-	const [loading, setLoading] = useState(false) // Add loading state
+  const [searchInput, setSearchInput] = useState("") // State for search input
+  const [selectedIngredients, setSelectedIngredients] = useState([]) // State for selected ingredients
+  const [recipes, setRecipes] = useState([]) // State for fetched recipes
+  const [loading, setLoading] = useState(false) // Add loading state
 
-	// Example ingredient tiles
-	const allIngredients = ["egg", "milk", "cheese", "butter", "flour", "sugar"]
+  // Example ingredient tiles
+  const allIngredients = ["egg", "milk", "cheese", "butter", "flour", "sugar"]
 
-	// Filter ingredients based on search input
-	const filteredIngredients = allIngredients.filter((ingredient) =>
-		ingredient.toLowerCase().includes(searchInput.toLowerCase())
-	)
+  // Filter ingredients based on search input
+  const filteredIngredients = allIngredients.filter((ingredient) =>
+    ingredient.toLowerCase().includes(searchInput.toLowerCase())
+  )
 
-	// Toggle ingredient selection
-	const toggleIngredient = (ingredient) => {
-		setSelectedIngredients((prev) =>
-			prev.includes(ingredient)
-				? prev.filter((item) => item !== ingredient)
-				: [...prev, ingredient]
-		)
-	}
+  // Toggle ingredient selection
+  const toggleIngredient = (ingredient) => {
+    setSelectedIngredients((prev) =>
+      prev.includes(ingredient)
+        ? prev.filter((item) => item !== ingredient)
+        : [...prev, ingredient]
+    )
+  }
 
-	// Handle search button click
-	const handleSearch = async (e) => {
-		e.preventDefault()
-		if (selectedIngredients.length === 0) {
-			alert("Please select at least one ingredient.")
-			return
-		}
+  // Handle search button click
+  const handleSearch = async (e) => {
+    e.preventDefault()
+    if (selectedIngredients.length === 0) {
+      alert("Please select at least one ingredient.")
+      return
+    }
 
-		setLoading(true) // Set loading to true
-		try {
-			const response = await api.post("/api/ai-recipe-search/", {
-				ingredients: selectedIngredients,
-			})
-			setRecipes(response.data) // Assuming the API returns an array of recipes
-		} catch (error) {
-			console.error("Error fetching recipes:", error)
-			alert("Failed to fetch recipes. Please try again.")
-		} finally {
-			setLoading(false) // Set loading to false after fetching
-		}
-	}
+    setLoading(true) // Set loading to true
+    try {
+      const response = await api.post("/api/ai-recipe-search/", {
+        ingredients: selectedIngredients,
+      })
+      setRecipes(response.data) // Assuming the API returns an array of recipes
+    } catch (error) {
+      console.error("Error fetching recipes:", error)
+      alert("Failed to fetch recipes. Please try again.")
+    } finally {
+      setLoading(false) // Set loading to false after fetching
+    }
+  }
 
-	return (
-		<div className="bg-[url('../assets/layered-waves-haikei.svg')] bg-cover bg-center bg-no-repeat">
-			<div className="">
-			{/* Searchbar */}
-			<form className="max-w-md mx-auto py-10">
-				<label
-					htmlFor="default-search"
-					className="mb-2 text-sm font-medium text-gray-900 sr-only dark:text-white"
-				>
-					Search
-				</label>
-				<div className="relative">
-					<input
-						type="search"
-						id="default-search"
-						value={searchInput}
-						onChange={(e) => setSearchInput(e.target.value)} // Update search input state
-						className="block w-full p-4 ps-5 placeholder-office-green-600 text-sm text-spring-green-500 border-2 border-office-green-500 rounded-full bg-gray-50/0 focus:ring-emerald-500 focus:border-spring-green-500 [&::-webkit-search-cancel-button]:appearance-none"
-						placeholder="Search Ingredients..."
-					/>
-					<button
-          type="submit"
-          class="absolute end-3 top-1/2 -translate-y-1/2 p-2 hover:bg-emerald-500 rounded-full"
-        > <svg
-            class="w-4 h-4 text-office-green-500"
-            aria-hidden="true"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 20 20"
+  return (
+    <div className="bg-gunmetal-500/0">
+      <div className="">
+        {/* Searchbar */}
+        <form className="max-w-md mx-auto py-10">
+          <label
+            htmlFor="default-search"
+            className="mb-2 text-sm font-medium text-gray-900 sr-only dark:text-white"
           >
-            <path
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"
+            Search
+          </label>
+          <div className="relative">
+            <input
+              type="search"
+              id="default-search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)} // Update search input state
+              autoComplete="off"
+              className="block w-full p-4 ps-5 placeholder-office-green-600 text-sm text-spring-green-500 border-2 border-office-green-500 rounded-full bg-gray-50/0 focus:ring-emerald-500 focus:border-spring-green-500 [&::-webkit-search-cancel-button]:appearance-none"
+              placeholder="Search Ingredients..."
             />
-          </svg>
-        </button>
-				</div>
-			</form>
+            <button
+              type="submit"
+              class="absolute end-3 top-1/2 -translate-y-1/2 p-2 hover:bg-emerald-500 rounded-full"
+            >
+              {" "}
+              <svg
+                class="w-4 h-4 text-office-green-500"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"
+                />
+              </svg>
+            </button>
+          </div>
+        </form>
 
-			{/* Ingredient Tiles */}
-			<div className="p-5">
-				<div className="flex flex-wrap justify-center gap-4">
-					{filteredIngredients.map((ingredient) => (
-						<div
-							key={ingredient}
-							onClick={() => toggleIngredient(ingredient)}
-							className={`px-6 py-2 border-2 rounded-3xl text-center cursor-pointer ${
-								selectedIngredients.includes(ingredient)
-									? "bg-blue-500 text-white border-blue-500"
-									: "bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-500 dark:border-gray-600"
-							}`}
-						>
-							{ingredient}
-						</div>
-					))}
-				</div>
-			</div>
+        {/* Ingredient Tiles */}
+        <div className="p-5">
+          <div className="flex flex-wrap justify-center gap-4">
+            {filteredIngredients.map((ingredient) => (
+              <div
+                key={ingredient}
+                onClick={() => toggleIngredient(ingredient)}
+                className={`px-6 py-2 border-2 rounded-3xl text-center cursor-pointer ${
+                  selectedIngredients.includes(ingredient)
+                    ? "bg-blue-500 text-white border-blue-500"
+                    : "bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-500 dark:border-gray-600"
+                }`}
+              >
+                {ingredient}
+              </div>
+            ))}
+          </div>
+        </div>
 
-			{/* Search Button */}
-			<div className="flex justify-center mt-4">
-				<button
-					onClick={handleSearch}
-					className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-				>
-					Search
-				</button>
-			</div>
+        {/* Search Button */}
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={handleSearch}
+            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          >
+            Search
+          </button>
+        </div>
 
-			{/* Recipe Tiles */}
-			<div className="p-5 ">
-				{loading ? (
-					<div className="flex justify-center items-center">
-						<span className="loading loading-dots loading-xl"></span>
-					</div>
-				) : recipes.length > 0 ? (
-					<div className="flex flex-wrap justify-center gap-6">
-						{recipes.map((recipe) => (
-							<div
-								key={recipe.id}
-								className="bg-white border border-gray-200 rounded-lg shadow-md p-4 dark:bg-gray-800 dark:border-gray-700 max-w-xs"
-							>
-								{/* <ScrollVelocity
+        {/* Recipe Tiles */}
+        <div className="p-5 pb-100">
+          {loading ? (
+            <div className="flex justify-center items-center">
+              <span className="loading loading-dots loading-xl"></span>
+            </div>
+          ) : recipes.length > 0 ? (
+            <div className="flex flex-wrap justify-center gap-6">
+              {recipes.map((recipe) => (
+                <div
+                  key={recipe.id}
+                  className="bg-white border border-gray-200 rounded-lg shadow-md p-4 dark:bg-gray-800 dark:border-gray-700 max-w-xs"
+                >
+                  {/* <ScrollVelocity
 									texts={[recipe.name]}
 									velocity={-40}
 									className="custom-scroll-text text-2xl"
 								/> */}
-								<h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-									{recipe.name}
-								</h3>
-								<p className="text-gray-700 dark:text-gray-400 mb-4 truncate">
-									Ingredients:{" "}
-									{recipe.ingredients
-										.map((ingredient) => ingredient.name)
-										.join(", ")}
-								</p>
-								<button
-									className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-									onClick={() => alert(`Opening recipe: ${recipe.name}`)}
-								>
-									View Recipe
-								</button>
-							</div>
-						))}
-					</div>
-				) : (
-					<p className="text-gray-700 dark:text-gray-300 text-center">
-						No recipes found. Try selecting different ingredients.
-					</p>
-				)}
-			</div>
-		</div>
-		</div>
-	)
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                    {recipe.name}
+                  </h3>
+                  <p className="text-gray-700 dark:text-gray-400 mb-4 truncate">
+                    Ingredients:{" "}
+                    {recipe.ingredients
+                      .map((ingredient) => ingredient.name)
+                      .join(", ")}
+                  </p>
+                  <button
+                    className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+                    onClick={() => alert(`Opening recipe: ${recipe.name}`)}
+                  >
+                    View Recipe
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-700 dark:text-gray-300 text-center">
+              No recipes found. Try selecting different ingredients.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default Searchbar
