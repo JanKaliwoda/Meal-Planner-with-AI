@@ -2,6 +2,8 @@
 	/* <script src="frontend\node_modules\flowbite\dist\flowbite.min.js"></script> */
 }
 import React from "react";
+import { useState } from "react";
+import api from "../api"; // Adjust the import path as necessary
 import "../assets/layered-waves-haikei.svg"; // Ensure this path is correct
 import ScrollVelocity from "./ScrollVelocity"
 
@@ -51,7 +53,8 @@ function Searchbar() {
 	}
 
 	return (
-		<div className="bg-gray-900">
+		<div className="bg-[url('../assets/layered-waves-haikei.svg')] bg-cover bg-center bg-no-repeat">
+			<div className="">
 			{/* Searchbar */}
 			<form className="max-w-md mx-auto py-10">
 				<label
@@ -61,36 +64,38 @@ function Searchbar() {
 					Search
 				</label>
 				<div className="relative">
-					<div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-						<svg
-							className="w-4 h-4 text-gray-500 dark:text-gray-400"
-							aria-hidden="true"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 20 20"
-						>
-							<path
-								stroke="currentColor"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth="2"
-								d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"
-							/>
-						</svg>
-					</div>
 					<input
 						type="search"
 						id="default-search"
 						value={searchInput}
 						onChange={(e) => setSearchInput(e.target.value)} // Update search input state
-						className="block w-full p-4 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+						className="block w-full p-4 ps-5 placeholder-office-green-600 text-sm text-spring-green-500 border-2 border-office-green-500 rounded-full bg-gray-50/0 focus:ring-emerald-500 focus:border-spring-green-500 [&::-webkit-search-cancel-button]:appearance-none"
 						placeholder="Search Ingredients..."
 					/>
+					<button
+          type="submit"
+          class="absolute end-3 top-1/2 -translate-y-1/2 p-2 hover:bg-emerald-500 rounded-full"
+        > <svg
+            class="w-4 h-4 text-office-green-500"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 20 20"
+          >
+            <path
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"
+            />
+          </svg>
+        </button>
 				</div>
 			</form>
 
 			{/* Ingredient Tiles */}
-			<div className="p-5 bg-gray-100 dark:bg-gray-900">
+			<div className="p-5">
 				<div className="flex flex-wrap justify-center gap-4">
 					{filteredIngredients.map((ingredient) => (
 						<div
@@ -119,7 +124,7 @@ function Searchbar() {
 			</div>
 
 			{/* Recipe Tiles */}
-			<div className="p-5 bg-gray-100 dark:bg-gray-800">
+			<div className="p-5 ">
 				{loading ? (
 					<div className="flex justify-center items-center">
 						<span className="loading loading-dots loading-xl"></span>
@@ -160,6 +165,7 @@ function Searchbar() {
 					</p>
 				)}
 			</div>
+		</div>
 		</div>
 	)
 }

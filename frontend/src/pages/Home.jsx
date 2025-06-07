@@ -23,6 +23,7 @@ function Home() {
 				</p>
 			</div> */}
     </div>
+    
   );
 }
 
