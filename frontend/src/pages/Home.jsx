@@ -1,12 +1,20 @@
-import Logo from "../components/Logo";
+import CircularText from "../components/Logo";
+import Navbar from "../components/Navbar";
 import Searchbar from "../components/Searchbar";
+import bgImage from "../assets/blurry-gradient-haikei.svg";
 
 function Home() {
-	return (
-		<div>
-			<Logo />
-			<Searchbar />
-			{/* <div className="flex flex-col items-center justify-center min-h-screen bg-gray-700">
+  return (
+    <div className="bg-gunmetal-500">
+      <Navbar />
+      <CircularText
+        text="MEAL.PLANNER.WITH.AI "
+        onHover="speedUp"
+        spinDuration={20}
+        className="custom-class"
+      />
+      <Searchbar />
+      {/* <div className="flex flex-col items-center justify-center min-h-screen bg-gray-700">
 				<h1 className="text-4xl font-bold mb-4 text-gray-400">
 					Welcome to the Home Page
 				</h1>
@@ -14,8 +22,8 @@ function Home() {
 					This is the home page of your application.
 				</p>
 			</div> */}
-		</div>
-	);
+    </div>
+  );
 }
 
 export default Home;
