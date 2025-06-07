@@ -53,7 +53,7 @@ function Searchbar() {
   }
 
   return (
-    <div className="bg-[url('../assets/layered-waves-haikei.svg')] bg-scroll bg-cover bg-center bg-no-repeat">
+    <div className="bg-gunmetal-500/0">
       <div className="">
         {/* Searchbar */}
         <form className="max-w-md mx-auto py-10">
