@@ -99,6 +99,18 @@ def get_weighted_phrase_embedding(ingredient_list, embeddings_index):
         return np.sum(embeddings, axis=0) / np.sum(weights)
     else:
         return np.zeros(next(iter(embeddings_index.values())).shape)
+    
+    
+# def recommend_by_ingredient_overlap(user_ingredients, recipes_df, top_n=3):
+#     user_set = set([i.strip().lower() for i in user_ingredients])
+#     results = []
+#     for idx, row in recipes_df.iterrows():
+#         recipe_ingredients = set(row['ner_labeled'].split())
+#         overlap = user_set & recipe_ingredients
+#         results.append((len(overlap), row['title'], row['dish_type'], row['ner_labeled']))
+#     # Sort by number of overlapping ingredients, descending
+#     results.sort(reverse=True, key=lambda x: x[0])
+#     return results[:top_n]
 
 def find_recipes_by_ingredients(ingredient_list, top_n=3):
     """
@@ -126,3 +138,4 @@ def find_recipes_by_ingredients(ingredient_list, top_n=3):
             best_recipe = recipes.iloc[best_idx]
             recipe_titles.append(best_recipe['title'])
     return recipe_titles
+
