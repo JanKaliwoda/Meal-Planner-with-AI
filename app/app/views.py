@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 import sys
 import os
 
@@ -321,6 +322,9 @@ class GoogleLoginView(APIView):
 
 
 def normalize_title(title):
+    # Remove content inside parentheses, including the parentheses
+    title = re.sub(r'\(.*?\)', '', title)
+    # Normalize the title
     return title.strip().lower().replace("’", "'").replace("`", "'").replace("”", '"').replace("“", '"')
 
 # AI Recipe Search based on ingredients
@@ -352,6 +356,16 @@ class AIRecipeSearchView(APIView):
             norm_ai_title = normalize_title(ai_title)
             if norm_ai_title in normalized_db:
                 matched_recipes.append(normalized_db[norm_ai_title])
+
+        # Serialize recipes with ingredients and other information
+        serialized_recipes = []
+        for recipe in matched_recipes:
+            serialized_recipes.append({
+                "id": recipe.id,
+                "name": recipe.name,
+                "ingredients": list(recipe.ingredients.values_list('name', flat=True)),
+            })
+                
 
         print(f"AIRecipeSearchView: Found {len(matched_recipes)} recipes for {ingredients}")
         print("AI returned recipe titles:", recipe_titles)
