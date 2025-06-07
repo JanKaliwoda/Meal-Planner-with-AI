@@ -61,21 +61,21 @@ The application follows a three-layer architecture:
   PostgreSQL or MongoDB stores user data, ingredients, recipes, and meal history.
 
 - **AI Module**  
-  Uses GPT-3 to generate recipes and recommendations based on input data. Optional support for custom models.
+  ~~Uses GPT-3~~ Uses self-created model to generate recipes and recommendations based on input data. **Optional support for custom models**.
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Area        | Technology             |
-|-------------|------------------------|
-| Frontend    | React, HTML, CSS, JS   |
-| Backend     | Django, Django REST    |
-| Database    | PostgreSQL / MongoDB   |
-| AI          | OpenAI GPT-3           |
-| Image AI    | Google Vision API *(optional)* |
-| Deployment  | Docker, Heroku / AWS   |
-| DevOps      | Docker, CI/CD          |
+| Area        | Technology                                 |
+|-------------|--------------------------------------------|
+| Frontend    | React, HTML, CSS, JS                       |
+| Backend     | Django, Django REST                        |
+| Database    | PostgreSQL / MongoDB                       |
+| AI          | ~~OpenAI GPT-3~~ Self built model          |
+| Image AI    | Google Vision API *(optional)*             |
+| Deployment  | Docker, Heroku / AWS                       |
+| DevOps      | Docker, CI/CD                              |
 
 ---
 
@@ -88,7 +88,7 @@ The application follows a three-layer architecture:
 - Stores and manages user-inputted ingredients.
 
 ### 🍽️ Recipe Generation Module
-- Uses GPT-3 to create recipes and communicates results via API.
+- Uses ~~GPT-3~~ to create recipes and communicates results via API.
 
 ---
 
