@@ -7,10 +7,10 @@ function Navbar() {
   return (
     <>
       {/* Navbar */}
-      <div className="navbar bg-gunmetal-300 shadow-sm flex items-center mt-2 px-2">
+      <div className="navbar bg-gunmetal-500 flex items-center px-2">
         <div className="flex-none">
           <button
-            className="btn btn-square btn-ghost w-12 h-12"
+            className="btn btn-square btn-ghost w-12 h-12 hover:bg-emerald-500/50"
             onClick={() => setSidebarOpen(true)}
           >
             <svg
@@ -41,7 +41,7 @@ function Navbar() {
             </div>
             <ul
               tabIndex={0}
-              className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-64 p-4 shadow"
+              className="menu menu-sm dropdown-content bg-gunmetal-300 rounded-box z-1 mt-3 w-64 p-4 shadow"
             >
               <li>
                 <Link className="justify-between text-base py-2" to="/account">

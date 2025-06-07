@@ -1,10 +1,11 @@
 import CircularText from "../components/Logo";
 import Navbar from "../components/Navbar";
 import Searchbar from "../components/Searchbar";
+import bgImage from "../assets/blurry-gradient-haikei.svg";
 
 function Home() {
   return (
-    <div>
+    <div className="bg-gunmetal-500">
       <Navbar />
       <CircularText
         text="MEAL.PLANNER.WITH.AI "

@@ -4,8 +4,8 @@
 @plugin "flowbite/plugin";
 @source "../node_modules/flowbite";
 
-
 @theme {
+
   --color-gunmetal-100: #020a0b;
   --color-gunmetal-200: #041316;
   --color-gunmetal-300: #061d22;
