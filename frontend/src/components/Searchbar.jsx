@@ -6,6 +6,7 @@ function Searchbar() {
 	const [searchInput, setSearchInput] = useState("") // State for search input
 	const [selectedIngredients, setSelectedIngredients] = useState([]) // State for selected ingredients
 	const [recipes, setRecipes] = useState([]) // State for fetched recipes
+	const [loading, setLoading] = useState(false) // Add loading state
 
 	// Example ingredient tiles
 	const allIngredients = ["egg", "milk", "cheese", "butter", "flour", "sugar"]
@@ -32,6 +33,7 @@ function Searchbar() {
 			return
 		}
 
+		setLoading(true) // Set loading to true
 		try {
 			const response = await api.post("/api/ai-recipe-search/", {
 				ingredients: selectedIngredients,
@@ -40,6 +42,8 @@ function Searchbar() {
 		} catch (error) {
 			console.error("Error fetching recipes:", error)
 			alert("Failed to fetch recipes. Please try again.")
+		} finally {
+			setLoading(false) // Set loading to false after fetching
 		}
 	}
 
@@ -113,26 +117,25 @@ function Searchbar() {
 
 			{/* Recipe Tiles */}
 			<div className="p-5 bg-gray-100 dark:bg-gray-800">
-				{recipes.length > 0 ? (
-					<div
-						className={`grid gap-6 justify-center`}
-						style={{
-							gridTemplateColumns: `repeat(${Math.min(
-								recipes.length,
-								5
-							)}, minmax(0, 1fr))`,
-						}}
-					>
+				{loading ? (
+					<div className="flex justify-center items-center">
+						<span className="loading loading-dots loading-xl"></span>
+					</div>
+				) : recipes.length > 0 ? (
+					<div className="flex flex-wrap justify-center gap-6">
 						{recipes.map((recipe) => (
 							<div
 								key={recipe.id}
-								className="bg-white border border-gray-200 rounded-lg shadow-md p-4 dark:bg-gray-800 dark:border-gray-700 max-w-xs" // Limit max width
+								className="bg-white border border-gray-200 rounded-lg shadow-md p-4 dark:bg-gray-800 dark:border-gray-700 max-w-xs"
 							>
-								<ScrollVelocity
+								{/* <ScrollVelocity
 									texts={[recipe.name]}
 									velocity={-40}
 									className="custom-scroll-text text-2xl"
-								/>
+								/> */}
+								<h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+									{recipe.name}
+								</h3>
 								<p className="text-gray-700 dark:text-gray-400 mb-4 truncate">
 									Ingredients:{" "}
 									{recipe.ingredients

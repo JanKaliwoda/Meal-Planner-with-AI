@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 import sys
 import os
 
@@ -321,6 +322,9 @@ class GoogleLoginView(APIView):
 
 
 def normalize_title(title):
+    # Remove content inside parentheses, including the parentheses
+    title = re.sub(r'\(.*?\)', '', title)
+    # Normalize the title
     return title.strip().lower().replace("’", "'").replace("`", "'").replace("”", '"').replace("“", '"')
 
 # AI Recipe Search based on ingredients
