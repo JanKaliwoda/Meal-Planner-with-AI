@@ -27,7 +27,7 @@ function Navbar() {
   return (
     <>
       {/* Navbar */}
-      <div className="navbar bg-gunmetal-500 flex items-center px-2">
+      <div className="navbar bg-gunmetal-500 flex items-center px-2 z-50 relative">
         <div className="flex-none">
           <button
             className="btn btn-square btn-ghost w-12 h-12 hover:bg-emerald-500/50"
