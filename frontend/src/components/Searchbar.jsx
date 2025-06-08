@@ -52,24 +52,34 @@ function Searchbar() {
         return
       }
       try {
-        const response = await api.get(`/api/ingredient-all-data/?search=${searchInput}`)
-        setDynamicIngredients(response.data.slice(0, 12).map((item) => item.name))
+        // Get 100 ingredients from API
+        const response = await api.get(`/api/ingredient-all-data/?search=${searchInput}&limit=100`)
+        
+        if (response.data && Array.isArray(response.data)) {
+          // Process ingredients: get names, filter single words, limit to 12
+          const processedIngredients = response.data
+            .map(item => item.name)                           // Get names
+            .filter(name => !name.includes(' '))              // Keep only single-word ingredients
+            .slice(0, 12);                                    // Take first 12
+
+          setDynamicIngredients(processedIngredients)
+        }
       } catch (error) {
         console.error("Error fetching ingredients:", error)
+        setDynamicIngredients([])
       }
     }
 
-    fetchIngredients()
+    // Add debounce to prevent too many API calls
+    const timeoutId = setTimeout(fetchIngredients, 300)
+    return () => clearTimeout(timeoutId)
   }, [searchInput])
 
   // Determine which ingredients to display
   useEffect(() => {
     const ingredients = searchInput.trim() === "" ? staticIngredients : dynamicIngredients
 
-    // Filter for single-word ingredients
-    const singleWordIngredients = ingredients.filter(ing => !ing.includes(' '))
-
-    const combinedIngredients = Array.from(new Set([...selectedIngredients, ...singleWordIngredients]))
+    const combinedIngredients = Array.from(new Set([...selectedIngredients, ...ingredients]))
 
     const sortedIngredients = [...combinedIngredients].sort((a, b) => {
       const isASelected = selectedIngredients.includes(a)
