@@ -275,16 +275,30 @@ function Searchbar() {
               <h2 className="text-xl font-bold text-spring-green-400 mb-4">
                 {selectedRecipe.name}
               </h2>
-              <p className="text-white mb-4">
-                <strong className="text-spring-green-400">Ingredients:</strong>{" "}
-                {selectedRecipe.ingredients
-                  .map((ingredient) => ingredient.name)
-                  .join(", ")}
-              </p>
-              <p className="text-white mb-4">
-                <strong className="text-spring-green-400">Description:</strong>{" "}
-                {selectedRecipe.description || "No description available."}
-              </p>
+              <p className="text-spring-green-400 font-bold mb-1">Ingredients:</p>
+              <ul className="mb-4 text-white list-disc list-inside">
+                {Array.isArray(selectedRecipe.ingredients)
+                  ? selectedRecipe.ingredients.map((ing, idx) =>
+                      typeof ing === "string" ? (
+                        <li key={idx}>{ing}</li>
+                      ) : (
+                        <li key={idx}>{ing.name}</li>
+                      )
+                    )
+                  : // fallback if ingredients is not an array
+                    <li>No ingredients listed.</li>}
+              </ul>
+              <p className="text-spring-green-400 font-bold mb-1">Description:</p>
+              <div className="text-white mb-4 whitespace-pre-line">
+                {selectedRecipe.steps
+                  ? selectedRecipe.steps
+                      .split(/;\s*|\n/) // split on semicolon or newline
+                      .filter(line => line.trim() !== "")
+                      .map((line, idx) => (
+                        <div key={idx}>{line.trim()}</div>
+                      ))
+                  : "No description available."}
+              </div>
               <div className="flex justify-end">
                 <button
                   onClick={closeModal}
