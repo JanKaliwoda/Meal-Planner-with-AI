@@ -129,11 +129,11 @@ function Navbar({ onSidebarChange }) {
         </button>
         <nav className="flex flex-col mt-10 gap-4 px-6">
           <Link
-            to="/fridge"
+            to="/storage"
             className="w-full px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors"
             onClick={() => setSidebarOpen(false)}
           >
-            My Fridge
+            Storage
           </Link>
           <Link
             to="/calendar"

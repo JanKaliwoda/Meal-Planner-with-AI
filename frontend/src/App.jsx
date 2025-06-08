@@ -7,7 +7,7 @@ import NotFound from "./pages/NotFound"
 import ProtectedRoute from "./components/ProtectedRoute"
 import Account from "./pages/Account"
 import Calendar from "./pages/Calendar"
-import Storage from "./pages/Storage" // <-- import your new Storage page
+import Storage from "./pages/Storage" 
 
 function Logout() {
   localStorage.clear()

@@ -58,9 +58,9 @@ function Searchbar() {
         if (response.data && Array.isArray(response.data)) {
           // Process ingredients: get names, filter single words, limit to 12
           const processedIngredients = response.data
-            .map(item => item.name)                           // Get names
-            .filter(name => !name.includes(' '))              // Keep only single-word ingredients
-            .slice(0, 12);                                    // Take first 12
+            .map(item => item.name)
+            .filter(name => !name.includes(' '))
+            .slice(0, 12)
 
           setDynamicIngredients(processedIngredients)
         }
@@ -115,7 +115,7 @@ function Searchbar() {
 
   const handleSearch = async (e) => {
     setHasSearched(true)
-    e.preventDefault()
+    if (e) e.preventDefault()
     setCurrentPage(1)
     if (selectedIngredients.length === 0) {
       addAlert("Please select at least one ingredient!")
@@ -131,6 +131,33 @@ function Searchbar() {
     } catch (error) {
       console.error("Error fetching recipes:", error)
       alert("Failed to fetch recipes. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Search recipes by storage ingredients
+  const handleStorageSearch = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get("/api/ingredients/")
+      const storageIngredients = res.data.map(i => i.name)
+      if (storageIngredients.length === 0) {
+        addAlert("You have no ingredients in storage!")
+        setLoading(false)
+        return
+      }
+      setSelectedIngredients(storageIngredients)
+      setSearchInput("")
+      setHasSearched(true)
+      setCurrentPage(1)
+      const response = await api.post("/api/ai-recipe-search/", {
+        ingredients: storageIngredients,
+      })
+      setRecipes(response.data)
+    } catch (error) {
+      addAlert("Failed to fetch your storage ingredients.")
+      console.error(error)
     } finally {
       setLoading(false)
     }
@@ -191,7 +218,7 @@ function Searchbar() {
       const response = await api.post('/api/meals/', {
         recipe_id: selectedRecipe.id,
         date: selectedDate.toISOString().split('T')[0],
-        meal_type: selectedMealType // Use the selected meal type
+        meal_type: selectedMealType
       }, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -200,7 +227,6 @@ function Searchbar() {
 
       if (response.status === 201) {
         setShowAddMealModal(false)
-        // Show success message or update UI
         alert('Meal added successfully!')
       }
     } catch (error) {
@@ -240,7 +266,7 @@ function Searchbar() {
           >
             Search
           </label>
-          <div className="relative">
+          <div className="relative flex items-center">
             <input
               type="search"
               id="default-search"
@@ -250,6 +276,15 @@ function Searchbar() {
               className="block w-full p-4 ps-5 placeholder-office-green-600 text-sm text-spring-green-500 border-2 border-office-green-500 rounded-full bg-gray-50/0 focus:ring-emerald-500 focus:border-spring-green-500 [&::-webkit-search-cancel-button]:appearance-none"
               placeholder="Search Ingredients..."
             />
+            <button
+              type="button"
+              onClick={handleStorageSearch}
+              className="ml-2 px-3 py-2 rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition-colors text-xs absolute right-2 top-1/2 -translate-y-1/2"
+              style={{ fontSize: "0.85rem" }}
+              title="Search recipes with your storage"
+            >
+              My Storage
+            </button>
           </div>
         </form>
 
@@ -465,19 +500,19 @@ function Searchbar() {
               </div>
 
               <div>
-          <label className="block text-spring-green-400 text-sm font-bold mb-2">
-            Select Meal Type
-          </label>
-          <select
-            value={selectedMealType}
-            onChange={(e) => setSelectedMealType(e.target.value)}
-            className="w-full px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white"
-          >
-            <option value="breakfast">Breakfast</option>
-            <option value="lunch">Lunch</option>
-            <option value="dinner">Dinner</option>
-          </select>
-        </div>
+                <label className="block text-spring-green-400 text-sm font-bold mb-2">
+                  Select Meal Type
+                </label>
+                <select
+                  value={selectedMealType}
+                  onChange={(e) => setSelectedMealType(e.target.value)}
+                  className="w-full px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white"
+                >
+                  <option value="breakfast">Breakfast</option>
+                  <option value="lunch">Lunch</option>
+                  <option value="dinner">Dinner</option>
+                </select>
+              </div>
             </div>
 
             <div className="flex justify-end gap-4 mt-6">

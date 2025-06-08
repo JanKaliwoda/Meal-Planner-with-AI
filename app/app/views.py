@@ -474,4 +474,3 @@ class AIRecipeSearchView(APIView):
 
         # Return recipes in the same structure as before
         return Response(RecipeSerializer(matched_recipes, many=True).data)
-    
