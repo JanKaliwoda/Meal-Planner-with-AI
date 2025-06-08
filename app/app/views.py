@@ -297,25 +297,41 @@ class MealViewSet(viewsets.ModelViewSet):
             return Response({"error": "Recipe not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # Get or create the meal for the user, date, and meal_type
-        meal, created = Meal.objects.get_or_create(
-            user=request.user,
-            date=date,
-            meal_type=meal_type,
-            defaults={"recipe": recipe}
-        )
-        # If the meal already exists, update the recipe
-        if not created:
-            meal.recipe = recipe
-            meal.save()
+        @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated])
+        def add_recipe_to_calendar(self, request):
+            """
+            Assign a recipe to a specific date (and optionally meal_type) for the current user.
+            Expects: {"recipe_id": 123, "date": "2025-06-10", "meal_type": "dinner"}
+            """
+            recipe_id = request.data.get("recipe_id")
+            date = request.data.get("date")
+            meal_type = request.data.get("meal_type", "dinner")  # default to dinner if not provided
 
-        # Return the meal info
-        return Response({
-            "id": meal.id,
-            "date": meal.date,
-            "meal_type": meal.meal_type,
-            "recipe": meal.recipe.name,
-        }, status=status.HTTP_201_CREATED)
+            # Check if required fields are present
+            if not recipe_id or not date:
+                return Response({"error": "recipe_id and date are required."}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Try to get the recipe by ID
+            try:
+                recipe = Recipe.objects.get(id=recipe_id)
+            except Recipe.DoesNotExist:
+                return Response({"error": "Recipe not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            # Always create a new meal, even if one exists for this date/type/recipe
+            meal = Meal.objects.create(
+                user=request.user,
+                date=date,
+                meal_type=meal_type,
+                recipe=recipe
+            )
+
+            return Response({
+                "id": meal.id,
+                "date": meal.date,
+                "meal_type": meal.meal_type,
+                "recipe": meal.recipe.name,
+            }, status=status.HTTP_201_CREATED)
+        
 #  Shopping List
 class ShoppingListViewSet(viewsets.ModelViewSet):
     serializer_class = ShoppingListSerializer

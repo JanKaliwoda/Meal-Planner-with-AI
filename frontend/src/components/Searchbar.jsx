@@ -5,161 +5,244 @@ import "../assets/layered-waves-haikei.svg"
 import SpotlightCard from "./SpotlightCard"
 
 function Searchbar() {
-	const [searchInput, setSearchInput] = useState("")
-	const [selectedIngredients, setSelectedIngredients] = useState([])
-	const [recipes, setRecipes] = useState([])
-	const [loading, setLoading] = useState(false)
-	const [alerts, setAlerts] = useState([])
-	const [selectedRecipe, setSelectedRecipe] = useState(null)
-	const [isModalOpen, setIsModalOpen] = useState(false)
-	const [hasSearched, setHasSearched] = useState(false)
-	const [currentPage, setCurrentPage] = useState(1)
-	const [dynamicIngredients, setDynamicIngredients] = useState([]) // For API ingredients
-	const [filteredIngredients, setFilteredIngredients] = useState([])
-	const [showNoIngredientsMessage, setShowNoIngredientsMessage] =
-		useState(false) // New state for controlling the message
-	const recipesPerPage = 4
+  const [searchInput, setSearchInput] = useState("")
+  const [selectedIngredients, setSelectedIngredients] = useState([])
+  const [recipes, setRecipes] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [alerts, setAlerts] = useState([])
+  const [selectedRecipe, setSelectedRecipe] = useState(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [dynamicIngredients, setDynamicIngredients] = useState([])
+  const [filteredIngredients, setFilteredIngredients] = useState([])
+  const [showNoIngredientsMessage, setShowNoIngredientsMessage] = useState(false)
+  const recipesPerPage = 4
 
-	const staticIngredients = [
-		"egg",
-		"milk",
-		"cheese",
-		"butter",
-		"flour",
-		"sugar",
-		"tomato",
-		"onion",
-		"chicken",
-		"beef",
-		"pasta",
-		"rice",
-		"carrot",
-		"potato",
-		"garlic",
-	]
+  const staticIngredients = [
+    "egg",
+    "milk",
+    "cheese",
+    "butter",
+    "flour",
+    "sugar",
+    "tomato",
+    "onion",
+    "chicken",
+    "beef",
+    "pasta",
+    "rice",
+    "carrot",
+    "potato",
+    "garlic",
+  ]
 
-	// Fetch ingredients from API when searchInput changes
-	useEffect(() => {
-		const fetchIngredients = async () => {
-			if (searchInput.trim() === "") {
-				setDynamicIngredients([]) // Reset to empty if search is cleared
-				return
-			}
-			try {
-				const response = await api.get(
-					`/api/ingredient-all-data/?search=${searchInput}`
-				)
-				setDynamicIngredients(
-					response.data.slice(0, 12).map((item) => item.name)
-				) // Extract ingredient names
-			} catch (error) {
-				console.error("Error fetching ingredients:", error)
-			}
-		}
+  // Fetch ingredients from API when searchInput changes
+  useEffect(() => {
+    const fetchIngredients = async () => {
+      if (searchInput.trim() === "") {
+        setDynamicIngredients([])
+        return
+      }
+      try {
+        const response = await api.get(`/api/ingredient-all-data/?search=${searchInput}`)
+        setDynamicIngredients(response.data.slice(0, 12).map((item) => item.name))
+      } catch (error) {
+        console.error("Error fetching ingredients:", error)
+      }
+    }
 
-		fetchIngredients()
-	}, [searchInput])
+    fetchIngredients()
+  }, [searchInput])
 
-	// Determine which ingredients to display
-	useEffect(() => {
-		const ingredients =
-			searchInput.trim() === "" ? staticIngredients : dynamicIngredients
+  // Determine which ingredients to display
+  useEffect(() => {
+    const ingredients = searchInput.trim() === "" ? staticIngredients : dynamicIngredients
 
-		// Combine selected ingredients with the current ingredients
-		const combinedIngredients = Array.from(
-			new Set([...selectedIngredients, ...ingredients])
-		)
+    const combinedIngredients = Array.from(new Set([...selectedIngredients, ...ingredients]))
 
-		// Sort ingredients to show selected ones first
-		const sortedIngredients = [...combinedIngredients].sort((a, b) => {
-			const isASelected = selectedIngredients.includes(a)
-			const isBSelected = selectedIngredients.includes(b)
-			if (isASelected && !isBSelected) return -1 // a comes first
-			if (!isASelected && isBSelected) return 1 // b comes first
-			return 0 // no change in order
-		})
+    const sortedIngredients = [...combinedIngredients].sort((a, b) => {
+      const isASelected = selectedIngredients.includes(a)
+      const isBSelected = selectedIngredients.includes(b)
+      if (isASelected && !isBSelected) return -1
+      if (!isASelected && isBSelected) return 1
+      return 0
+    })
 
-		setFilteredIngredients(sortedIngredients)
-	}, [searchInput, dynamicIngredients, selectedIngredients])
+    setFilteredIngredients(sortedIngredients)
+  }, [searchInput, dynamicIngredients, selectedIngredients])
 
-	// Show "No ingredients found" message after a delay if no ingredients are available
-	useEffect(() => {
-		if (filteredIngredients.length === 0) {
-			// Set a timeout to show the message after 0.2 seconds
-			const timeout = setTimeout(() => {
-				setShowNoIngredientsMessage(true)
-			}, 200)
+  // Show "No ingredients found" message after a delay if no ingredients are available
+  useEffect(() => {
+    if (filteredIngredients.length === 0) {
+      const timeout = setTimeout(() => {
+        setShowNoIngredientsMessage(true)
+      }, 200)
 
-			// Clear the timeout if the ingredients change before 0.2 seconds
-			return () => clearTimeout(timeout)
-		} else {
-			// Hide the message if there are ingredients
-			setShowNoIngredientsMessage(false)
-		}
-	}, [filteredIngredients])
+      return () => clearTimeout(timeout)
+    } else {
+      setShowNoIngredientsMessage(false)
+    }
+  }, [filteredIngredients])
 
-	const toggleIngredient = (ingredient) => {
-		setSelectedIngredients((prev) =>
-			prev.includes(ingredient)
-				? prev.filter((item) => item !== ingredient)
-				: [...prev, ingredient]
-		)
-	}
+  const toggleIngredient = (ingredient) => {
+    setSelectedIngredients((prev) =>
+      prev.includes(ingredient)
+        ? prev.filter((item) => item !== ingredient)
+        : [...prev, ingredient]
+    )
+  }
 
-	const handleSearch = async (e) => {
-		setHasSearched(true)
-		e.preventDefault()
-		setCurrentPage(1)
-		if (selectedIngredients.length === 0) {
-			addAlert("Please select at least one ingredient!")
-			return
-		}
+  const handleSearch = async (e) => {
+    setHasSearched(true)
+    e.preventDefault()
+    setCurrentPage(1)
+    if (selectedIngredients.length === 0) {
+      addAlert("Please select at least one ingredient!")
+      return
+    }
 
-		setLoading(true)
-		try {
-			const response = await api.post("/api/ai-recipe-search/", {
-				ingredients: selectedIngredients,
-			})
-			setRecipes(response.data)
-		} catch (error) {
-			console.error("Error fetching recipes:", error)
-			alert("Failed to fetch recipes. Please try again.")
-		} finally {
-			setLoading(false)
-		}
-	}
+    setLoading(true)
+    try {
+      const response = await api.post("/api/ai-recipe-search/", {
+        ingredients: selectedIngredients,
+      })
+      setRecipes(response.data)
+    } catch (error) {
+      console.error("Error fetching recipes:", error)
+      alert("Failed to fetch recipes. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
-	const addAlert = (message) => {
-		const id = Date.now()
-		setAlerts((prevAlerts) => [
-			...prevAlerts,
-			{ id, message, visible: true },
-		])
+  const addAlert = (message) => {
+    const id = Date.now()
+    setAlerts((prevAlerts) => [...prevAlerts, { id, message, visible: true }])
 
-		setTimeout(() => {
-			setAlerts((prevAlerts) =>
-				prevAlerts.map((alert) =>
-					alert.id === id ? { ...alert, visible: false } : alert
-				)
-			)
-		}, 500)
+    setTimeout(() => {
+      setAlerts((prevAlerts) =>
+        prevAlerts.map((alert) =>
+          alert.id === id ? { ...alert, visible: false } : alert
+        )
+      )
+    }, 500)
 
-		setTimeout(() => {
-			setAlerts((prevAlerts) =>
-				prevAlerts.filter((alert) => alert.id !== id)
-			)
-		}, 2500)
-	}
+    setTimeout(() => {
+      setAlerts((prevAlerts) => prevAlerts.filter((alert) => alert.id !== id))
+    }, 2500)
+  }
 
-	const openModal = (recipe) => {
-		setSelectedRecipe(recipe)
-		setIsModalOpen(true)
-	}
+  const openModal = (recipe) => {
+    setSelectedRecipe(recipe)
+    setIsModalOpen(true)
+  }
 
-	const closeModal = () => {
-		setSelectedRecipe(null)
-		setIsModalOpen(false)
-	}
+  const closeModal = () => {
+    setSelectedRecipe(null)
+    setIsModalOpen(false)
+  }
+
+  // Pagination logic
+  const totalPages = Math.ceil(recipes.length / recipesPerPage)
+  const paginatedRecipes = recipes.slice(
+    (currentPage - 1) * recipesPerPage,
+    currentPage * recipesPerPage
+  )
+
+  const handlePrevPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1))
+  }
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+  }
+
+  return (
+    <div className="bg-gunmetal-500/0">
+      <div className="">
+        {/* Alerts */}
+        {alerts.map((alert) => (
+          <div
+            key={alert.id}
+            role="alert"
+            className={`alert alert-warning fixed top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 flex items-center justify-center gap-2 p-4 text-yellow-800 bg-yellow-100 border border-yellow-300 rounded-lg shadow-lg transition-opacity duration-500 ${
+              alert.visible ? "opacity-80" : "opacity-0"
+            }`}
+          >
+            <span>{alert.message}</span>
+          </div>
+        ))}
+
+        {/* Searchbar */}
+        <form className="max-w-md mx-auto py-10">
+          <label
+            htmlFor="default-search"
+            className="mb-2 text-sm font-medium text-gray-900 sr-only dark:text-white"
+          >
+            Search
+          </label>
+          <div className="relative">
+            <input
+              type="search"
+              id="default-search"
+              value={searchInput}
+              autoComplete="false"
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="block w-full p-4 ps-5 placeholder-office-green-600 text-sm text-spring-green-500 border-2 border-office-green-500 rounded-full bg-gray-50/0 focus:ring-emerald-500 focus:border-spring-green-500 [&::-webkit-search-cancel-button]:appearance-none"
+              placeholder="Search Ingredients..."
+            />
+          </div>
+        </form>
+
+        {/* Ingredient Tiles */}
+        <div className="p-5">
+          <div className="max-w-4xl mx-auto w-full">
+            <div className="h-64 overflow-y-auto rounded-lg p-4">
+              {filteredIngredients.length === 0 && showNoIngredientsMessage ? (
+                <div className="text-center text-gray-500">No ingredients found.</div>
+              ) : (
+                <motion.div
+                  layout
+                  className="grid grid-cols-6 gap-4"
+                  transition={{ duration: 0.5 }}
+                >
+                  <AnimatePresence>
+                    {filteredIngredients.map((ingredient) => (
+                      <motion.div
+                        key={ingredient}
+                        layout
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        onClick={() => toggleIngredient(ingredient)}
+                        className={`flex items-center justify-center px-6 py-2 border-2 rounded-3xl text-center cursor-pointer ${
+                          selectedIngredients.includes(ingredient)
+                            ? "bg-emerald-500 text-white border-emerald-500"
+                            : "bg-gunmetal-400 text-white border-office-green-500 hover:bg-emerald-500/20"
+                        }`}
+                      >
+                        {ingredient}
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Search Button */}
+        <div className="flex justify-center mt-4 px-5 mb-6">
+          <button
+            onClick={handleSearch}
+            className="w-full max-w-md px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
+          >
+            Search Recipes
+          </button>
+        </div>
+      </div>
 
       {/* Recipe Tiles */}
       <div className="p-5 pb-100">
@@ -170,9 +253,9 @@ function Searchbar() {
         ) : recipes.length > 0 ? (
           <>
             <div className="flex flex-wrap justify-center gap-6">
-              {paginatedRecipes.slice(0, 4).map((recipe, idx) => (
+              {paginatedRecipes.map((recipe) => (
                 <SpotlightCard
-                  key={recipe.id ? `${recipe.id}-${idx}` : idx}
+                  key={recipe.id}
                   className="custom-spotlight-card"
                   spotlightColor="rgba(0, 229, 255, 0.2)"
                 >
@@ -185,9 +268,7 @@ function Searchbar() {
                     </h3>
                     <p className="text-white mb-4 truncate">
                       Ingredients:{" "}
-                      {recipe.ingredients
-                        .map((ingredient) => ingredient.name)
-                        .join(", ")}
+                      {recipe.ingredients.map((ingredient) => ingredient.name).join(", ")}
                     </p>
                   </div>
                 </SpotlightCard>
@@ -231,251 +312,53 @@ function Searchbar() {
         ) : null}
       </div>
 
-	const handlePrevPage = () => {
-		setCurrentPage((prev) => Math.max(prev - 1, 1))
-	}
-
-	const handleNextPage = () => {
-		setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-	}
-
-	return (
-		<div className="bg-gunmetal-500/0">
-			<div className="">
-				{/* Alerts */}
-				{alerts.map((alert) => (
-					<div
-						key={alert.id}
-						role="alert"
-						className={`alert alert-warning fixed top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 flex items-center justify-center gap-2 p-4 text-yellow-800 bg-yellow-100 border border-yellow-300 rounded-lg shadow-lg transition-opacity duration-500 ${
-							alert.visible ? "opacity-80" : "opacity-0"
-						}`}
-					>
-						<span>{alert.message}</span>
-					</div>
-				))}
-
-				{/* Searchbar */}
-				<form className="max-w-md mx-auto py-10">
-					<label
-						htmlFor="default-search"
-						className="mb-2 text-sm font-medium text-gray-900 sr-only dark:text-white"
-					>
-						Search
-					</label>
-					<div className="relative">
-						<input
-							type="search"
-							id="default-search"
-							value={searchInput}
-							autoComplete="false"
-							onChange={(e) => setSearchInput(e.target.value)}
-							className="block w-full p-4 ps-5 placeholder-office-green-600 text-sm text-spring-green-500 border-2 border-office-green-500 rounded-full bg-gray-50/0 focus:ring-emerald-500 focus:border-spring-green-500 [&::-webkit-search-cancel-button]:appearance-none"
-							placeholder="Search Ingredients..."
-						/>
-					</div>
-				</form>
-
-				{/* Ingredient Tiles */}
-				<div className="p-5">
-					<div className="max-w-4xl mx-auto w-full">
-						{/* Fixed height container with scrolling */}
-						<div className="h-64 overflow-y-auto rounded-lg p-4">
-							{filteredIngredients.length === 0 &&
-							showNoIngredientsMessage ? (
-								<div className="text-center text-gray-500">
-									No ingredients found.
-								</div>
-							) : (
-								<motion.div
-									layout
-									className="grid grid-cols-6 gap-4"
-									transition={{ duration: 0.5 }}
-								>
-									<AnimatePresence>
-										{filteredIngredients.map(
-											(ingredient) => (
-												<motion.div
-													key={ingredient}
-													layout
-													initial={{ opacity: 0 }} // Start fully transparent
-													animate={{ opacity: 1 }} // Fade in to full opacity
-													exit={{ opacity: 0 }} // Fade out to fully transparent
-													transition={{
-														duration: 0.3,
-														ease: "easeInOut",
-													}} // Smooth easing
-													onClick={() =>
-														toggleIngredient(
-															ingredient
-														)
-													}
-													className={`flex items-center justify-center px-6 py-2 border-2 rounded-3xl text-center cursor-pointer ${
-														selectedIngredients.includes(
-															ingredient
-														)
-															? "bg-emerald-500 text-white border-emerald-500"
-															: "bg-gunmetal-400 text-white border-office-green-500 hover:bg-emerald-500/20"
-													}`}
-												>
-													{ingredient}
-												</motion.div>
-											)
-										)}
-									</AnimatePresence>
-								</motion.div>
-							)}
-						</div>
-					</div>
-				</div>
-
-				{/* Search Button */}
-				<div className="flex justify-center mt-4 px-5 mb-6">
-					<button
-						onClick={handleSearch}
-						className="w-full max-w-md px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
-					>
-						Search Recipes
-					</button>
-				</div>
-			</div>
-
-			{/* Recipe Tiles */}
-			<div className="p-5 pb-100">
-				{loading ? (
-					<div className="flex justify-center items-center">
-						<span className="loading loading-dots loading-xl"></span>
-					</div>
-				) : recipes.length > 0 ? (
-					<>
-						<div className="flex flex-wrap justify-center gap-6">
-							{paginatedRecipes.map((recipe) => (
-								<SpotlightCard
-									key={recipe.id}
-									className="custom-spotlight-card"
-									spotlightColor="rgba(0, 229, 255, 0.2)"
-								>
-									<div
-										className="bg-gunmetal-300 border-2 border-office-green-500 rounded-lg p-4 w-80 h-34 flex flex-col justify-between cursor-pointer hover:bg-emerald-500/20 transition-colors"
-										onClick={() => openModal(recipe)}
-									>
-										<h3 className="text-lg font-bold text-spring-green-400 mb-2">
-											{recipe.name}
-										</h3>
-										<p className="text-white mb-4 truncate">
-											Ingredients:{" "}
-											{recipe.ingredients
-												.map(
-													(ingredient) =>
-														ingredient.name
-												)
-												.join(", ")}
-										</p>
-									</div>
-								</SpotlightCard>
-							))}
-						</div>
-						{/* Pagination Controls */}
-						{totalPages > 1 && (
-							<div className="flex justify-center items-center mt-6 gap-4">
-								<button
-									onClick={handlePrevPage}
-									disabled={currentPage === 1}
-									className={`px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white font-bold transition-colors ${
-										currentPage === 1
-											? "opacity-50 cursor-not-allowed"
-											: "hover:bg-emerald-500 hover:border-emerald-500"
-									}`}
-								>
-									Prev
-								</button>
-								<span className="text-spring-white-400 font-bold">
-									Page {currentPage} of {totalPages}
-								</span>
-								<button
-									onClick={handleNextPage}
-									disabled={currentPage === totalPages}
-									className={`px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white font-bold transition-colors ${
-										currentPage === totalPages
-											? "opacity-50 cursor-not-allowed"
-											: "hover:bg-emerald-500 hover:border-emerald-500"
-									}`}
-								>
-									Next
-								</button>
-							</div>
-						)}
-					</>
-				) : hasSearched ? (
-					<p className="text-spring-green-400 text-center">
-						No recipes found. Try selecting different ingredients.
-					</p>
-				) : null}
-			</div>
-
-			{/* Recipe Modal */}
-			{isModalOpen && selectedRecipe && (
-				<div
-					className="fixed inset-0 bg-opacity-50 flex justify-center items-center z-50 transition-opacity duration-300"
-					onClick={closeModal}
-					style={{
-						animation: isModalOpen ? "fadeIn 0.3s" : "fadeOut 0.3s",
-					}}
-				>
-					<SpotlightCard>
-						<div
-							className="bg-gunmetal-300 rounded-lg shadow-xl p-6 max-w-lg w-full"
-							onClick={(e) => e.stopPropagation()}
-						>
-							<h2 className="text-xl font-bold text-spring-green-400 mb-4">
-								{selectedRecipe.name}
-							</h2>
-							<p className="text-spring-green-400 font-bold mb-1">
-								Ingredients:
-							</p>
-							<ul className="mb-4 text-white list-disc list-inside">
-								{selectedRecipe.description ? (
-									selectedRecipe.description
-										.replace(/[\[\]"]+/g, "") // remove brackets and quotes
-										.split(",")
-										.map((ing, idx) => (
-											<li key={idx}>{ing.trim()}</li>
-										))
-								) : (
-									<li>No ingredients listed.</li>
-								)}
-							</ul>
-							<p className="text-spring-green-400 font-bold mb-1">
-								Description:
-							</p>
-							<div className="text-white mb-4 whitespace-pre-line">
-								{selectedRecipe.steps
-									? selectedRecipe.steps
-											.split(/;\s*|\n/) // split on semicolon or newline
-											.filter(
-												(line) => line.trim() !== ""
-											)
-											.map((line, idx) => (
-												<div key={idx}>
-													{line.trim()}
-												</div>
-											))
-									: "No description available."}
-							</div>
-							<div className="flex justify-end">
-								<button
-									onClick={closeModal}
-									className="px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors"
-								>
-									Close
-								</button>
-							</div>
-						</div>
-					</SpotlightCard>
-				</div>
-			)}
-		</div>
-	)
+      {/* Recipe Modal */}
+      {isModalOpen && selectedRecipe && (
+        <div
+          className="fixed inset-0 bg-opacity-50 flex justify-center items-center z-50 transition-opacity duration-300"
+          onClick={closeModal}
+          style={{ animation: isModalOpen ? "fadeIn 0.3s" : "fadeOut 0.3s" }}
+        >
+          <SpotlightCard>
+            <div
+              className="bg-gunmetal-300 rounded-lg shadow-xl p-6 max-w-lg w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-xl font-bold text-spring-green-400 mb-4">
+                {selectedRecipe.name}
+              </h2>
+              <p className="text-spring-green-400 font-bold mb-1">Ingredients:</p>
+              <ul className="mb-4 text-white list-disc list-inside">
+                {selectedRecipe.description
+                  ? selectedRecipe.description
+                      .replace(/[\[\]"]+/g, "")
+                      .split(",")
+                      .map((ing, idx) => <li key={idx}>{ing.trim()}</li>)
+                  : <li>No ingredients listed.</li>}
+              </ul>
+              <p className="text-spring-green-400 font-bold mb-1">Description:</p>
+              <div className="text-white mb-4 whitespace-pre-line">
+                {selectedRecipe.steps
+                  ? selectedRecipe.steps
+                      .split(/;\s*|\n/)
+                      .filter((line) => line.trim() !== "")
+                      .map((line, idx) => <div key={idx}>{line.trim()}</div>)
+                  : "No description available."}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={closeModal}
+                  className="px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </SpotlightCard>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default Searchbar
