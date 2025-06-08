@@ -236,7 +236,7 @@ function Searchbar() {
                 >
                   Prev
                 </button>
-                <span className="text-spring-green-400 font-bold">
+                <span className="text-spring-white-400 font-bold">
                   Page {currentPage} of {totalPages}
                 </span>
                 <button
