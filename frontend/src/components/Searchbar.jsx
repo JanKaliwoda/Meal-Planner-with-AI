@@ -161,12 +161,75 @@ function Searchbar() {
 		setIsModalOpen(false)
 	}
 
-	// Pagination logic
-	const totalPages = Math.ceil(recipes.length / recipesPerPage)
-	const paginatedRecipes = recipes.slice(
-		(currentPage - 1) * recipesPerPage,
-		currentPage * recipesPerPage
-	)
+      {/* Recipe Tiles */}
+      <div className="p-5 pb-100">
+        {loading ? (
+          <div className="flex justify-center items-center">
+            <span className="loading loading-dots loading-xl"></span>
+          </div>
+        ) : recipes.length > 0 ? (
+          <>
+            <div className="flex flex-wrap justify-center gap-6">
+              {paginatedRecipes.slice(0, 4).map((recipe, idx) => (
+                <SpotlightCard
+                  key={recipe.id ? `${recipe.id}-${idx}` : idx}
+                  className="custom-spotlight-card"
+                  spotlightColor="rgba(0, 229, 255, 0.2)"
+                >
+                  <div
+                    className="bg-gunmetal-300 border-2 border-office-green-500 rounded-lg p-4 w-80 h-34 flex flex-col justify-between cursor-pointer hover:bg-emerald-500/20 transition-colors"
+                    onClick={() => openModal(recipe)}
+                  >
+                    <h3 className="text-lg font-bold text-spring-green-400 mb-2">
+                      {recipe.name}
+                    </h3>
+                    <p className="text-white mb-4 truncate">
+                      Ingredients:{" "}
+                      {recipe.ingredients
+                        .map((ingredient) => ingredient.name)
+                        .join(", ")}
+                    </p>
+                  </div>
+                </SpotlightCard>
+              ))}
+            </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center mt-6 gap-4">
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1}
+                  className={`px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white font-bold transition-colors ${
+                    currentPage === 1
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-emerald-500 hover:border-emerald-500"
+                  }`}
+                >
+                  Prev
+                </button>
+                <span className="text-spring-white-400 font-bold">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className={`px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white font-bold transition-colors ${
+                    currentPage === totalPages
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-emerald-500 hover:border-emerald-500"
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
+        ) : hasSearched ? (
+          <p className="text-spring-green-400 text-center">
+            No recipes found. Try selecting different ingredients.
+          </p>
+        ) : null}
+      </div>
 
 	const handlePrevPage = () => {
 		setCurrentPage((prev) => Math.max(prev - 1, 1))
