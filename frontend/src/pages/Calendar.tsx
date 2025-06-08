@@ -5,6 +5,8 @@ import backgroundImage from "../assets/layered-waves-haikei.svg"
 import Navbar from "../components/Navbar"
 import { useNavigate } from "react-router-dom"
 import SpotlightCard from "../components/SpotlightCard"
+import { ACCESS_TOKEN } from "../constants"
+import api from "../api"
 
 
 export default function Home() {
@@ -40,53 +42,72 @@ type CalendarEvent = {
 }
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
 
-  useEffect(() => {
-  setIsLoaded(true)
-  fetchEvents() // Add this line to fetch events
-
-  // Show AI popup after 3 seconds
-  const popupTimer = setTimeout(() => {
-    setShowAIPopup(true)
-  }, 3000)
-
-  return () => clearTimeout(popupTimer)
-}, [])
-
-// Replace const events with useState
+  // Add these with your other state declarations
 const [events, setEvents] = useState<CalendarEvent[]>([])
-
-// Add this with your other state declarations
 const [isLoading, setIsLoading] = useState(true)
-
-// Update the fetchEvents function
-const fetchEvents = async () => {
+// Update the fetchMeals function
+const fetchMeals = async () => {
   setIsLoading(true)
   try {
-    const token = localStorage.getItem('token')
-    const response = await fetch('http://localhost:8000/api/calendar/events/', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+    const token = localStorage.getItem(ACCESS_TOKEN)
+    if (!token) {
+      navigate('/login')
+      return
     }
 
-    const data = await response.json()
-    setEvents(data)
+    const response = await api.get('/api/meals/', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      }
+    })
+
+    // Convert meals to calendar events
+    const calendarEvents: CalendarEvent[] = response.data.map(meal => ({
+      id: meal.id,
+      recipe: meal.recipe,
+      date: meal.date,
+      meal_type: meal.meal_type,
+      user: meal.user
+    }))
+
+    setEvents(calendarEvents)
   } catch (error) {
-    console.error('Error fetching events:', error)
+    if (error.response?.status === 401) {
+      localStorage.removeItem(ACCESS_TOKEN)
+      navigate('/login')
+    } else {
+      console.error('Error fetching meals:', error)
+    }
   } finally {
     setIsLoading(false)
   }
 }
 
+// Update useEffect to handle initial data fetch
+useEffect(() => {
+  const initializeCalendar = async () => {
+    setIsLoaded(true)
+    
+    // Get current date
+    const today = new Date()
+    const startOfWeek = new Date(today)
+    startOfWeek.setDate(today.getDate() - today.getDay())
+
+    // Update states with current date
+    setCurrentMonth(today.toLocaleString('default', { month: 'long', year: 'numeric' }))
+    setCurrentDate(`${today.toLocaleString('default', { month: 'long' })} ${today.getDate()}`)
+    setWeekDates(getWeekDates(startOfWeek))
+
+    // Fetch meals
+    await fetchMeals()
+  }
+
+  initializeCalendar()
+}, [])
 
 
   // Sample calendar days for the week view
-  const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
+  const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
   const [weekDates, setWeekDates] = useState([3, 4, 5, 6, 7, 8, 9])
   const timeSlots = Array.from({ length: 9 }, (_, i) => i + 8) // 8 AM to 4 PM
   
@@ -140,8 +161,6 @@ const fetchEvents = async () => {
   setWeekDates(getWeekDates(startOfWeek))
 }
 
-
-
 const handleNextWeek = () => {
   const newDate = new Date(currentDateObj)
   newDate.setDate(newDate.getDate() + 7)
@@ -164,27 +183,22 @@ const getWeekDates = (startDate: Date) => {
   })
 }
 
-// Update your useEffect hook
+  // Update your existing useEffect
 useEffect(() => {
-  // Set initial load state
   setIsLoaded(true)
-
+  
   // Get current date
   const today = new Date()
   const startOfWeek = new Date(today)
-  startOfWeek.setDate(today.getDate() - today.getDay()) // Get Sunday of current week
+  startOfWeek.setDate(today.getDate() - today.getDay())
 
   // Update states with current date
   setCurrentMonth(today.toLocaleString('default', { month: 'long', year: 'numeric' }))
   setCurrentDate(`${today.toLocaleString('default', { month: 'long' })} ${today.getDate()}`)
   setWeekDates(getWeekDates(startOfWeek))
 
-  // Show AI popup after 3 seconds
-  const popupTimer = setTimeout(() => {
-    setShowAIPopup(true)
-  }, 3000)
-
-  return () => clearTimeout(popupTimer)
+  // Fetch meals
+  fetchMeals()
 }, [])
 
 // Update your handleToday function to use the helper
@@ -199,6 +213,10 @@ const handleToday = () => {
   setCurrentDate(`${today.toLocaleString('default', { month: 'long' })} ${today.getDate()}`)
   setWeekDates(getWeekDates(startOfWeek))
 }
+
+  const handleEventClick = (event: CalendarEvent) => {
+    setSelectedEvent(event)
+  }
 
   return (
     <div className="relative min-h-screen bg-gunmetal-500">
@@ -358,7 +376,7 @@ const handleToday = () => {
           >
             <div
               className="bg-gunmetal-300 border-2 border-office-green-500 rounded-lg p-2 cursor-pointer hover:bg-emerald-500/20 transition-colors"
-              onClick={() => handleEventClick(event)}
+              onClick={() => setSelectedEvent(event)}  // Changed from handleEventClick to setSelectedEvent
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs text-spring-green-400/70">
