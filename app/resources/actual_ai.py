@@ -1,12 +1,13 @@
 from tensorflow.keras.models import load_model
 import joblib
-import numpy as np
 import pandas as pd
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from nltk.stem import WordNetLemmatizer
-import pickle
 import re
-import os
+
+# Load model, label encoder, and precomputed recipe embeddings
+model = load_model("recipe_model.keras")
+label_encoder = joblib.load("label_encoder.pkl")
+recipes_df = pd.read_pickle("recipe_embeddings.pkl")
 
 # Ingredient normalization function
 lemmatizer = WordNetLemmatizer()
@@ -15,19 +16,27 @@ def normalize_ingredient(word):
     word = re.sub(r'[^\w\s]', '', word)  # Remove punctuation
     return lemmatizer.lemmatize(word)
 
-def recommend_by_ingredient_overlap(user_ingredients, recipes_df, top_n=3):
-    # Normalize user ingredients
-    user_set = set([normalize_ingredient(i.strip()) for i in user_ingredients])
-    results = []
-    for idx, row in recipes_df.iterrows():
-        recipe_ingredients = set([normalize_ingredient(w) for w in row['ner_labeled'].split()])
-        overlap = user_set & recipe_ingredients
-        results.append((len(overlap), row['title'], row['dish_type'], row['ner_labeled']))
-    # Sort by number of overlapping ingredients, descending
-    results.sort(reverse=True, key=lambda x: x[0])
-    return results[:top_n]
+# Precompute normalized ingredients ONCE
+def precompute_normalized_ingredients(df):
+    return df.assign(
+        normalized_ingredients=df['ner_labeled'].apply(
+            lambda s: set(normalize_ingredient(w) for w in s.split())
+        )
+    )
 
-# You need to load recipes_df somewhere above, e.g.:
+recipes_df = precompute_normalized_ingredients(recipes_df)
+
+def recommend_by_ingredient_overlap(user_ingredients, recipes_df, top_n=3):
+    user_set = set(normalize_ingredient(i.strip()) for i in user_ingredients)
+    # Vectorized overlap count
+    recipes_df = recipes_df.copy()
+    recipes_df['overlap_count'] = recipes_df['normalized_ingredients'].apply(lambda s: len(s & user_set))
+    recipes_df['matched'] = recipes_df['normalized_ingredients'].apply(lambda s: s & user_set)
+    recipes_df['not_matched'] = recipes_df['normalized_ingredients'].apply(lambda s: s - user_set)
+    top = recipes_df.sort_values('overlap_count', ascending=False).head(top_n)
+    return top
+
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESOURCES_DIR = os.path.join(BASE_DIR, 'resources')
