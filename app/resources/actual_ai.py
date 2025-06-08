@@ -1,11 +1,26 @@
+from tensorflow.keras.models import load_model
+import joblib
+import numpy as np
 import pandas as pd
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+from nltk.stem import WordNetLemmatizer
+import pickle
+import re
 import os
 
+# Ingredient normalization function
+lemmatizer = WordNetLemmatizer()
+def normalize_ingredient(word):
+    word = word.lower()
+    word = re.sub(r'[^\w\s]', '', word)  # Remove punctuation
+    return lemmatizer.lemmatize(word)
+
 def recommend_by_ingredient_overlap(user_ingredients, recipes_df, top_n=3):
-    user_set = set([i.strip().lower() for i in user_ingredients])
+    # Normalize user ingredients
+    user_set = set([normalize_ingredient(i.strip()) for i in user_ingredients])
     results = []
     for idx, row in recipes_df.iterrows():
-        recipe_ingredients = set(row['ner_labeled'].split())
+        recipe_ingredients = set([normalize_ingredient(w) for w in row['ner_labeled'].split()])
         overlap = user_set & recipe_ingredients
         results.append((len(overlap), row['title'], row['dish_type'], row['ner_labeled']))
     # Sort by number of overlapping ingredients, descending
