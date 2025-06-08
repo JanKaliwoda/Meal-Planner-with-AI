@@ -5,7 +5,7 @@ import backgroundImage from "../assets/layered-waves-haikei.svg"
 import Navbar from "../components/Navbar"
 import { useNavigate } from "react-router-dom"
 import SpotlightCard from "../components/SpotlightCard"
-import { ACCESS_TOKEN } from "../constants"
+import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants"
 import api from "../api"
 
 
@@ -103,6 +103,56 @@ useEffect(() => {
   }
 
   initializeCalendar()
+}, [])
+
+const [userMeals, setUserMeals] = useState<CalendarEvent[]>([])
+
+const fetchUserMeals = async () => {
+  try {
+    const token = localStorage.getItem(ACCESS_TOKEN)
+    if (!token) {
+      navigate('/login')
+      return
+    }
+
+    const response = await api.get('/api/meals/', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    // Convert meals to calendar events
+    const calendarEvents: CalendarEvent[] = response.data.map(meal => ({
+      id: meal.id,
+      recipe: meal.recipe,
+      date: meal.date,
+      meal_type: meal.meal_type,
+      user: meal.user
+    }))
+
+    setUserMeals(calendarEvents)
+  } catch (error) {
+    if (error.response?.status === 401) {
+      localStorage.removeItem(ACCESS_TOKEN)
+      localStorage.removeItem(REFRESH_TOKEN)
+      navigate('/login')
+    } else {
+      console.error('Error fetching user meals:', error)
+    }
+  }
+}
+
+// Update the useEffect to properly handle errors
+useEffect(() => {
+  const loadUserMeals = async () => {
+    try {
+      await fetchUserMeals()
+    } catch (error) {
+      console.error('Failed to load user meals:', error)
+    }
+  }
+
+  loadUserMeals()
 }, [])
 
 
@@ -243,40 +293,43 @@ const handleToday = () => {
           {/* Main Content */}
           <main className="relative h-screen w-full flex">
       {/* Sidebar */}
-      <div
-        className={`w-64 h-full bg-gunmetal-400/80 backdrop-blur-lg p-4 shadow-xl border-r border-office-green-500 rounded-tr-3xl opacity-0 ${
-          isLoaded ? "animate-fade-in" : ""
-        } flex flex-col justify-between`}
-        style={{ animationDelay: "0.4s" }}
-      >
-        <div>
-          <button className="mb-6 flex items-center justify-center gap-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors w-full px-4 py-3">
-            <span className="text-xl">+</span>
-            <span>Create</span>
-          </button>
-    
-                {/* Mini Calendar */}
-                <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-spring-green-400 font-medium">{currentMonth}</h3>
-              
-            </div>
+<div
+  className={`w-64 h-full bg-gunmetal-400/80 backdrop-blur-lg p-4 shadow-xl border-r border-office-green-500 rounded-tr-3xl opacity-0 ${
+    isLoaded ? "animate-fade-in" : ""
+  } flex flex-col`}
+  style={{ animationDelay: "0.4s" }}
+>
+  <button className="mb-6 flex items-center justify-center gap-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors w-full px-4 py-3">
+    <span className="text-xl">+</span>
+    <span>Add New Meal</span>
+  </button>
+
+  {/* User's Meals */}
+  <div className="flex-1 overflow-y-auto">
+    <h3 className="text-spring-green-400 font-medium mb-3">My Meals</h3>
+    <div className="space-y-2">
+      {userMeals.map((meal, index) => (
+        <div
+          key={index}
+          className="bg-gunmetal-300 border border-office-green-500 rounded-lg p-2 cursor-pointer hover:bg-emerald-500/20 transition-colors"
+          onClick={() => setSelectedEvent(meal)}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-spring-green-400/70">
+              {meal.meal_type.toUpperCase()}
+            </span>
+            <span className="text-xs text-spring-green-400/70">
+              {new Date(meal.date).toLocaleDateString()}
+            </span>
           </div>
-    
-                {/* My Calendars */}
-                <div>
-            <h3 className="text-spring-green-400 font-medium mb-3">📅 My calendars</h3>
-            <div className="space-y-2">
-              {myCalendars.map((cal, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-sm ${cal.color}`}></div>
-                  <span className="text-spring-green-400 text-sm">{cal.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <h4 className="text-sm font-medium text-spring-green-400 truncate">
+            {meal.recipe.name}
+          </h4>
         </div>
-      </div>
+      ))}
+    </div>
+  </div>
+</div>
     
             {/* Calendar View */}
             <div
@@ -314,9 +367,8 @@ const handleToday = () => {
         <div className="flex-1 overflow-auto p-4">
           <div className="bg-gunmetal-400/80 backdrop-blur-lg rounded-xl border border-office-green-500 shadow-xl h-full">
             {/* Week Header */}
-            <div className="grid grid-cols-8 border-b border-office-green-500">
-              <div className="p-2 text-center text-spring-green-400/50 text-xs"></div>
-              {weekDays.map((day, i) => (
+            <div className="grid grid-cols-7 border-b border-office-green-500">
+  {weekDays.map((day, i) => (
   <div key={i} className="p-2 text-center border-l border-office-green-500">
     <div className="text-xs text-spring-green-400/70 font-medium">{day}</div>
     <div className="h-10 flex items-center justify-center"> {/* Added fixed height container */}
@@ -335,15 +387,7 @@ const handleToday = () => {
             </div>
     
                   {/* Time Grid */}
-                  <div className="grid grid-cols-8">
-                    {/* Time Labels */}
-                    <div className="text-white/70">
-                      {timeSlots.map((time, i) => (
-                        <div key={i} className="h-20 border-b border-white/10 pr-2 text-right text-xs">
-                          {time > 12 ? `${time - 12} PM` : `${time} AM`}
-                        </div>
-                      ))}
-                    </div>
+                  <div className="grid grid-cols-7">
 
 {/* Days Columns */}
 {Array.from({ length: 7 }).map((_, dayIndex) => (
