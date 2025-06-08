@@ -1,4 +1,4 @@
-import react from "react"
+import React from "react"
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import Login from "./pages/Login"
 import Register from "./pages/Register"
@@ -7,6 +7,7 @@ import NotFound from "./pages/NotFound"
 import ProtectedRoute from "./components/ProtectedRoute"
 import Account from "./pages/Account"
 import Calendar from "./pages/Calendar"
+import Storage from "./pages/Storage" // <-- import your new Storage page
 
 function Logout() {
   localStorage.clear()
@@ -50,9 +51,17 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/storage"
+          element={
+            <ProtectedRoute>
+              <Storage />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   )
 }
 
-export default App
+export default App;
