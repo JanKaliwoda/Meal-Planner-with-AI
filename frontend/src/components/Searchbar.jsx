@@ -44,7 +44,7 @@ function Searchbar() {
       }
       try {
         const response = await api.get(`/api/ingredient-all-data/?search=${searchInput}`)
-        setDynamicIngredients(response.data.map((item) => item.name)) // Extract ingredient names
+        setDynamicIngredients(response.data.slice(0, 12).map((item) => item.name)) // Extract ingredient names
       } catch (error) {
         console.error("Error fetching ingredients:", error)
       }
@@ -170,32 +170,35 @@ function Searchbar() {
         {/* Ingredient Tiles */}
         <div className="p-5">
           <div className="max-w-4xl mx-auto w-full">
-            <motion.div
-              layout
-              className="grid grid-cols-6 gap-4"
-              transition={{ duration: 0.5 }}
-            >
-              <AnimatePresence>
-                {filteredIngredients.map((ingredient) => (
-                  <motion.div
-                    key={ingredient}
-                    layout
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.3 }}
-                    onClick={() => toggleIngredient(ingredient)}
-                    className={`flex items-center justify-center px-6 py-2 border-2 rounded-3xl text-center cursor-pointer ${
-                      selectedIngredients.includes(ingredient)
-                        ? "bg-emerald-500 text-white border-emerald-500"
-                        : "bg-gunmetal-400 text-white border-office-green-500 hover:bg-emerald-500/20"
-                    }`}
-                  >
-                    {ingredient}
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </motion.div>
+            {/* Fixed height container with scrolling */}
+            <div className="h-64 overflow-y-auto rounded-lg p-4">
+              <motion.div
+                layout
+                className="grid grid-cols-6 gap-4"
+                transition={{ duration: 0.5 }}
+              >
+                <AnimatePresence>
+                  {filteredIngredients.map((ingredient) => (
+                    <motion.div
+                      key={ingredient}
+                      layout
+                      initial={{ opacity: 0 }} // Start fully transparent
+                      animate={{ opacity: 1 }} // Fade in to full opacity
+                      exit={{ opacity: 0 }} // Fade out to fully transparent
+                      transition={{ duration: 0.3, ease: "easeInOut" }} // Smooth easing
+                      onClick={() => toggleIngredient(ingredient)}
+                      className={`flex items-center justify-center px-6 py-2 border-2 rounded-3xl text-center cursor-pointer ${
+                        selectedIngredients.includes(ingredient)
+                          ? "bg-emerald-500 text-white border-emerald-500"
+                          : "bg-gunmetal-400 text-white border-office-green-500 hover:bg-emerald-500/20"
+                      }`}
+                    >
+                      {ingredient}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </motion.div>
+            </div>
           </div>
         </div>
 
