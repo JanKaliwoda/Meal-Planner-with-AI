@@ -3,11 +3,15 @@ import joblib
 import pandas as pd
 from nltk.stem import WordNetLemmatizer
 import re
+import os
 
 # Load model, label encoder, and precomputed recipe embeddings
-model = load_model("recipe_model.keras")
-label_encoder = joblib.load("label_encoder.pkl")
-recipes_df = pd.read_pickle("recipe_embeddings.pkl")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RESOURCES_DIR = os.path.join(BASE_DIR, 'resources')
+
+model = load_model(os.path.join(RESOURCES_DIR, "recipe_model.keras"))
+label_encoder = joblib.load(os.path.join(RESOURCES_DIR, "label_encoder.pkl"))
+recipes_df = pd.read_pickle(os.path.join(RESOURCES_DIR, "recipe_embeddings.pkl"))
 
 # Ingredient normalization function
 lemmatizer = WordNetLemmatizer()
@@ -26,26 +30,19 @@ def precompute_normalized_ingredients(df):
 
 recipes_df = precompute_normalized_ingredients(recipes_df)
 
-def recommend_by_ingredient_overlap(user_ingredients, recipes_df, top_n=3):
+def recommend_by_ingredient_subset(user_ingredients, recipes_df):
+    """
+    Return all recipes that contain at least all user ingredients (may have more).
+    """
     user_set = set(normalize_ingredient(i.strip()) for i in user_ingredients)
-    # Vectorized overlap count
-    recipes_df = recipes_df.copy()
-    recipes_df['overlap_count'] = recipes_df['normalized_ingredients'].apply(lambda s: len(s & user_set))
-    recipes_df['matched'] = recipes_df['normalized_ingredients'].apply(lambda s: s & user_set)
-    recipes_df['not_matched'] = recipes_df['normalized_ingredients'].apply(lambda s: s - user_set)
-    top = recipes_df.sort_values('overlap_count', ascending=False).head(top_n)
-    return top
+    mask = recipes_df['normalized_ingredients'].apply(lambda s: user_set.issubset(s))
+    filtered = recipes_df[mask]
+    return filtered
 
-
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RESOURCES_DIR = os.path.join(BASE_DIR, 'resources')
-recipes_df = pd.read_pickle(os.path.join(RESOURCES_DIR, "recipe_embeddings.pkl"))
-
-def find_recipes_by_ingredients(ingredient_list, top_n=3):
+def find_recipes_by_ingredients(ingredient_list, top_n=9):
     """
-    Returns a list of top recipe titles based on ingredient overlap.
+    Returns a list of recipe titles that contain at least all the given ingredients.
     """
-    overlap_results = recommend_by_ingredient_overlap(ingredient_list, recipes_df, top_n=top_n)
-    recipe_titles = [title for _, title, _, _ in overlap_results]
+    filtered_results = recommend_by_ingredient_subset(ingredient_list, recipes_df)
+    recipe_titles = list(filtered_results['title'])[:top_n]
     return recipe_titles
