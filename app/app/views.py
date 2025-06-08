@@ -5,7 +5,7 @@ import os
 
 from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.response import Response
-from rest_framework import generics, viewsets, filters as drf_filters
+from rest_framework import generics, viewsets, filters as drf_filters, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
@@ -18,7 +18,7 @@ from django_filters import rest_framework as dj_filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../resources'))
-from actual_ai import get_weighted_phrase_embedding, find_recipes_by_ingredients
+from actual_ai import find_recipes_by_ingredients
 
 from django.db.models import Q
 from .serializers import UserSerializer
@@ -181,17 +181,66 @@ class IngredientAllDataViewSet(viewsets.ModelViewSet):
     serializer_class = IngredientAllDataSerializer
     permission_classes = [IsAuthenticated]
 
-
-#  Recipes
+#  Recipe Management
 class RecipeViewSet(viewsets.ModelViewSet):
     serializer_class = RecipeSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # Return all recipes (could be filtered further if needed)
         return Recipe.objects.all()
 
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    def add_missing_ingredients_to_shopping_list(self, request, pk=None):
+        """
+        Add ingredients from the selected recipe to the user's shopping list,
+        but only those ingredients that are NOT already in the user's fridge.
+        """
+        recipe = self.get_object()
+        user = request.user
+
+        # Get all ingredient names in the user's fridge
+        user_ingredient_names = set(
+            user.ingredients.values_list('name', flat=True)
+        )
+
+        # Get all ingredient names required by the recipe
+        recipe_ingredient_names = set(
+            recipe.ingredients.values_list('name', flat=True)
+        )
+
+        # Find missing ingredients (those not in the user's fridge)
+        missing_ingredient_names = recipe_ingredient_names - user_ingredient_names
+
+        if not missing_ingredient_names:
+            # If all ingredients are already in the fridge, do nothing
+            return Response({"detail": "All ingredients are already in your fridge."})
+
+        # Get or create the user's current shopping list (could be improved to handle multiple lists)
+        shopping_list, _ = ShoppingList.objects.get_or_create(user=user)
+
+        # Add missing ingredients to the shopping list
+        added_items = []
+        for name in missing_ingredient_names:
+            # Find the IngredientAllData object for the missing ingredient
+            try:
+                ingredient_data = IngredientAllData.objects.get(name=name)
+            except IngredientAllData.DoesNotExist:
+                continue  # skip if not found
+
+            # Create a ShoppingListItem if not already present
+            item, created = ShoppingListItem.objects.get_or_create(
+                shopping_list=shopping_list,
+                ingredient=ingredient_data,
+                defaults={"quantity": "1"}
+            )
+            if created:
+                added_items.append(name)
+
+        return Response({
+            "added": list(added_items),
+            "detail": f"Added {len(added_items)} missing ingredients to your shopping list."
+        })
 
 
 #  Meal Planning with Filtering
@@ -211,11 +260,52 @@ class MealViewSet(viewsets.ModelViewSet):
     filterset_class = MealFilter
 
     def get_queryset(self):
+        # Return only meals belonging to the current user
         return Meal.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
+        # When creating a new meal, automatically assign it to the current user
         serializer.save(user=self.request.user)
 
+    @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated])
+    def add_recipe_to_calendar(self, request):
+        """
+        Assign a recipe to a specific date (and optionally meal_type) for the current user.
+        Expects: {"recipe_id": 123, "date": "2025-06-10", "meal_type": "dinner"}
+        """
+        recipe_id = request.data.get("recipe_id")
+        date = request.data.get("date")
+        meal_type = request.data.get("meal_type", "dinner")  # default to dinner if not provided
+
+        # Check if required fields are present
+        if not recipe_id or not date:
+            return Response({"error": "recipe_id and date are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Try to get the recipe by ID
+        try:
+            recipe = Recipe.objects.get(id=recipe_id)
+        except Recipe.DoesNotExist:
+            return Response({"error": "Recipe not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Get or create the meal for the user, date, and meal_type
+        meal, created = Meal.objects.get_or_create(
+            user=request.user,
+            date=date,
+            meal_type=meal_type,
+            defaults={"recipe": recipe}
+        )
+        # If the meal already exists, update the recipe
+        if not created:
+            meal.recipe = recipe
+            meal.save()
+
+        # Return the meal info
+        return Response({
+            "id": meal.id,
+            "date": meal.date,
+            "meal_type": meal.meal_type,
+            "recipe": meal.recipe.name,
+        }, status=status.HTTP_201_CREATED)
 
 #  Shopping List
 class ShoppingListViewSet(viewsets.ModelViewSet):
@@ -343,7 +433,7 @@ class AIRecipeSearchView(APIView):
         if not ingredients:
             return Response({"error": "No matching ingredients found."}, status=400)
 
-        # Use the AI function to get recipe titles
+        # Use the new overlap-based function to get recipe titles
         recipe_titles = find_recipes_by_ingredients(ingredients)
 
         # Normalize all DB recipe names once
@@ -357,17 +447,6 @@ class AIRecipeSearchView(APIView):
             if norm_ai_title in normalized_db:
                 matched_recipes.append(normalized_db[norm_ai_title])
 
-        # Serialize recipes with ingredients and other information
-        serialized_recipes = []
-        for recipe in matched_recipes:
-            serialized_recipes.append({
-                "id": recipe.id,
-                "name": recipe.name,
-                "ingredients": list(recipe.ingredients.values_list('name', flat=True)),
-            })
-                
-
-        print(f"AIRecipeSearchView: Found {len(matched_recipes)} recipes for {ingredients}")
-        print("AI returned recipe titles:", recipe_titles)
+        # Return recipes in the same structure as before
         return Response(RecipeSerializer(matched_recipes, many=True).data)
     

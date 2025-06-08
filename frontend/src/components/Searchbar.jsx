@@ -10,9 +10,11 @@ function Searchbar() {
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(false)
   const [alerts, setAlerts] = useState([])
-  const [selectedRecipe, setSelectedRecipe] = useState(null) // State for selected recipe
-  const [isModalOpen, setIsModalOpen] = useState(false) // State for modal visibility
+  const [selectedRecipe, setSelectedRecipe] = useState(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const recipesPerPage = 4
 
   const allIngredients = [
     "egg",
@@ -46,6 +48,7 @@ function Searchbar() {
   const handleSearch = async (e) => {
     setHasSearched(true)
     e.preventDefault()
+    setCurrentPage(1)
     if (selectedIngredients.length === 0) {
       addAlert("Please select at least one ingredient!")
       return
@@ -90,6 +93,21 @@ function Searchbar() {
   const closeModal = () => {
     setSelectedRecipe(null)
     setIsModalOpen(false)
+  }
+
+  // Pagination logic
+  const totalPages = Math.ceil(recipes.length / recipesPerPage)
+  const paginatedRecipes = recipes.slice(
+    (currentPage - 1) * recipesPerPage,
+    currentPage * recipesPerPage
+  )
+
+  const handlePrevPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1))
+  }
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
   }
 
   return (
@@ -163,13 +181,13 @@ function Searchbar() {
 
         {/* Search Button */}
         <div className="flex justify-center mt-4 px-5 mb-6">
-  <button
-    onClick={handleSearch}
-    className="w-full max-w-md px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
-  >
-    Search Recipes
-  </button>
-</div>
+          <button
+            onClick={handleSearch}
+            className="w-full max-w-md px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
+          >
+            Search Recipes
+          </button>
+        </div>
       </div>
 
       {/* Recipe Tiles */}
@@ -179,30 +197,62 @@ function Searchbar() {
             <span className="loading loading-dots loading-xl"></span>
           </div>
         ) : recipes.length > 0 ? (
-          <div className="flex flex-wrap justify-center gap-6">
-            {recipes.map((recipe) => (
-              <SpotlightCard
-                key={recipe.id}
-                className="custom-spotlight-card"
-                spotlightColor="rgba(0, 229, 255, 0.2)"
-              >
-                <div
-                  className="bg-gunmetal-300 border-2 border-office-green-500 rounded-lg p-4 max-w-xs cursor-pointer hover:bg-emerald-500/20 transition-colors"
-                  onClick={() => openModal(recipe)}
+          <>
+            <div className="flex flex-wrap justify-center gap-6">
+              {paginatedRecipes.map((recipe) => (
+                <SpotlightCard
+                  key={recipe.id}
+                  className="custom-spotlight-card"
+                  spotlightColor="rgba(0, 229, 255, 0.2)"
                 >
-                  <h3 className="text-lg font-bold text-spring-green-400 mb-2">
-                    {recipe.name}
-                  </h3>
-                  <p className="text-white mb-4 truncate">
-                    Ingredients:{" "}
-                    {recipe.ingredients
-                      .map((ingredient) => ingredient.name)
-                      .join(", ")}
-                  </p>
-                </div>
-              </SpotlightCard>
-            ))}
-          </div>
+                  <div
+                    className="bg-gunmetal-300 border-2 border-office-green-500 rounded-lg p-4 w-80 h-34 flex flex-col justify-between cursor-pointer hover:bg-emerald-500/20 transition-colors"
+                    onClick={() => openModal(recipe)}
+                  >
+                    <h3 className="text-lg font-bold text-spring-green-400 mb-2">
+                      {recipe.name}
+                    </h3>
+                    <p className="text-white mb-4 truncate">
+                      Ingredients:{" "}
+                      {recipe.ingredients
+                        .map((ingredient) => ingredient.name)
+                        .join(", ")}
+                    </p>
+                  </div>
+                </SpotlightCard>
+              ))}
+            </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center mt-6 gap-4">
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1}
+                  className={`px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white font-bold transition-colors ${
+                    currentPage === 1
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-emerald-500 hover:border-emerald-500"
+                  }`}
+                >
+                  Prev
+                </button>
+                <span className="text-spring-white-400 font-bold">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className={`px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white font-bold transition-colors ${
+                    currentPage === totalPages
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-emerald-500 hover:border-emerald-500"
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         ) : hasSearched ? (
           <p className="text-spring-green-400 text-center">
             No recipes found. Try selecting different ingredients.
@@ -214,8 +264,8 @@ function Searchbar() {
       {isModalOpen && selectedRecipe && (
         <div
           className="fixed inset-0 bg-opacity-50 flex justify-center items-center z-50 transition-opacity duration-300"
-          onClick={closeModal} // Close modal when clicking outside
-          style={{ animation: isModalOpen ? "fadeIn 0.3s" : "fadeOut 0.3s" }} // Fade effect
+          onClick={closeModal}
+          style={{ animation: isModalOpen ? "fadeIn 0.3s" : "fadeOut 0.3s" }}
         >
           <SpotlightCard>
             <div
@@ -225,16 +275,28 @@ function Searchbar() {
               <h2 className="text-xl font-bold text-spring-green-400 mb-4">
                 {selectedRecipe.name}
               </h2>
-              <p className="text-white mb-4">
-                <strong className="text-spring-green-400">Ingredients:</strong>{" "}
-                {selectedRecipe.ingredients
-                  .map((ingredient) => ingredient.name)
-                  .join(", ")}
-              </p>
-              <p className="text-white mb-4">
-                <strong className="text-spring-green-400">Description:</strong>{" "}
-                {selectedRecipe.description || "No description available."}
-              </p>
+              <p className="text-spring-green-400 font-bold mb-1">Ingredients:</p>
+              <ul className="mb-4 text-white list-disc list-inside">
+                {selectedRecipe.description
+                  ? selectedRecipe.description
+                      .replace(/[\[\]"]+/g, "") // remove brackets and quotes
+                      .split(",")
+                      .map((ing, idx) => (
+                        <li key={idx}>{ing.trim()}</li>
+                      ))
+                  : <li>No ingredients listed.</li>}
+              </ul>
+              <p className="text-spring-green-400 font-bold mb-1">Description:</p>
+              <div className="text-white mb-4 whitespace-pre-line">
+                {selectedRecipe.steps
+                  ? selectedRecipe.steps
+                      .split(/;\s*|\n/) // split on semicolon or newline
+                      .filter(line => line.trim() !== "")
+                      .map((line, idx) => (
+                        <div key={idx}>{line.trim()}</div>
+                      ))
+                  : "No description available."}
+              </div>
               <div className="flex justify-end">
                 <button
                   onClick={closeModal}
@@ -250,5 +312,4 @@ function Searchbar() {
     </div>
   )
 }
-
 export default Searchbar
