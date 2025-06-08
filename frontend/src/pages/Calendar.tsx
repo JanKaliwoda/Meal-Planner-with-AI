@@ -46,9 +46,20 @@ export default function Home() {
   }
 
   // Updated sample calendar events with all events before 4 PM
- const events = [
-    
-  ] 
+  const events = [
+    {
+      id: 1,
+      title: "Team Meeting",
+      startTime: "09:00",
+      endTime: "10:00",
+      color: "bg-blue-500",
+      day: 1,
+      description: "Weekly team sync-up",
+      location: "Conference Room A",
+      attendees: ["John Doe", "Jane Smith", "Bob Johnson"],
+      organizer: "Alice Brown",
+    },
+  ]
 
   // Sample calendar days for the week view
   const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
