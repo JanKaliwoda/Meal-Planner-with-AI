@@ -18,7 +18,7 @@ from django_filters import rest_framework as dj_filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../resources'))
-from actual_ai import get_weighted_phrase_embedding, find_recipes_by_ingredients
+from actual_ai import find_recipes_by_ingredients
 
 from django.db.models import Q
 from .serializers import UserSerializer
@@ -433,7 +433,7 @@ class AIRecipeSearchView(APIView):
         if not ingredients:
             return Response({"error": "No matching ingredients found."}, status=400)
 
-        # Use the AI function to get recipe titles
+        # Use the new overlap-based function to get recipe titles
         recipe_titles = find_recipes_by_ingredients(ingredients)
 
         # Normalize all DB recipe names once
@@ -447,17 +447,6 @@ class AIRecipeSearchView(APIView):
             if norm_ai_title in normalized_db:
                 matched_recipes.append(normalized_db[norm_ai_title])
 
-        # Serialize recipes with ingredients and other information
-        serialized_recipes = []
-        for recipe in matched_recipes:
-            serialized_recipes.append({
-                "id": recipe.id,
-                "name": recipe.name,
-                "ingredients": list(recipe.ingredients.values_list('name', flat=True)),
-            })
-                
-
-        print(f"AIRecipeSearchView: Found {len(matched_recipes)} recipes for {ingredients}")
-        print("AI returned recipe titles:", recipe_titles)
+        # Return recipes in the same structure as before
         return Response(RecipeSerializer(matched_recipes, many=True).data)
     
