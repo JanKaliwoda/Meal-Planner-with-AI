@@ -187,7 +187,7 @@ function Searchbar() {
               type="search"
               id="default-search"
               value={searchInput}
-              autoComplete="false"
+              autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
               className="block w-full p-4 ps-5 placeholder-office-green-600 text-sm text-spring-green-500 border-2 border-office-green-500 rounded-full bg-gray-50/0 focus:ring-emerald-500 focus:border-spring-green-500 [&::-webkit-search-cancel-button]:appearance-none"
               placeholder="Search Ingredients..."
