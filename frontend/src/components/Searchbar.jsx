@@ -277,16 +277,14 @@ function Searchbar() {
               </h2>
               <p className="text-spring-green-400 font-bold mb-1">Ingredients:</p>
               <ul className="mb-4 text-white list-disc list-inside">
-                {Array.isArray(selectedRecipe.ingredients)
-                  ? selectedRecipe.ingredients.map((ing, idx) =>
-                      typeof ing === "string" ? (
-                        <li key={idx}>{ing}</li>
-                      ) : (
-                        <li key={idx}>{ing.name}</li>
-                      )
-                    )
-                  : // fallback if ingredients is not an array
-                    <li>No ingredients listed.</li>}
+                {selectedRecipe.description
+                  ? selectedRecipe.description
+                      .replace(/[\[\]"]+/g, "") // remove brackets and quotes
+                      .split(",")
+                      .map((ing, idx) => (
+                        <li key={idx}>{ing.trim()}</li>
+                      ))
+                  : <li>No ingredients listed.</li>}
               </ul>
               <p className="text-spring-green-400 font-bold mb-1">Description:</p>
               <div className="text-white mb-4 whitespace-pre-line">
