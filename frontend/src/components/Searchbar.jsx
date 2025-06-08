@@ -253,9 +253,9 @@ function Searchbar() {
         ) : recipes.length > 0 ? (
           <>
             <div className="flex flex-wrap justify-center gap-6">
-              {paginatedRecipes.map((recipe) => (
+              {paginatedRecipes.slice(0, 4).map((recipe, idx) => (
                 <SpotlightCard
-                  key={recipe.id}
+                  key={recipe.id ? `${recipe.id}-${idx}` : idx}
                   className="custom-spotlight-card"
                   spotlightColor="rgba(0, 229, 255, 0.2)"
                 >
