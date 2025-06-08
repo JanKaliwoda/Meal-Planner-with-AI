@@ -84,6 +84,7 @@ function Storage() {
 
   return (
     <div className="min-h-screen bg-gunmetal-500 flex flex-col items-center py-8">
+      
       {/* Alerts */}
       {alerts.map(alert => (
         <div

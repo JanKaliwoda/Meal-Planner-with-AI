@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import backgroundImage from "../assets/layered-waves-haikei.svg"
 import Navbar from "../components/Navbar"
