@@ -66,7 +66,10 @@ function Searchbar() {
   useEffect(() => {
     const ingredients = searchInput.trim() === "" ? staticIngredients : dynamicIngredients
 
-    const combinedIngredients = Array.from(new Set([...selectedIngredients, ...ingredients]))
+    // Filter for single-word ingredients
+    const singleWordIngredients = ingredients.filter(ing => !ing.includes(' '))
+
+    const combinedIngredients = Array.from(new Set([...selectedIngredients, ...singleWordIngredients]))
 
     const sortedIngredients = [...combinedIngredients].sort((a, b) => {
       const isASelected = selectedIngredients.includes(a)
@@ -220,7 +223,7 @@ function Searchbar() {
         ))}
 
         {/* Searchbar */}
-        <form className="max-w-md mx-auto py-10">
+        <form className="max-w-md mx-auto pt-10">
           <label
             htmlFor="default-search"
             className="mb-2 text-sm font-medium text-gray-900 sr-only dark:text-white"
@@ -243,7 +246,7 @@ function Searchbar() {
         {/* Ingredient Tiles */}
         <div className="p-5">
           <div className="max-w-4xl mx-auto w-full">
-            <div className="h-64 overflow-y-auto rounded-lg p-4">
+            <div className="h-66 overflow-y-auto rounded-lg p-4">
               {filteredIngredients.length === 0 && showNoIngredientsMessage ? (
                 <div className="text-center text-gray-500">No ingredients found.</div>
               ) : (
@@ -351,7 +354,7 @@ function Searchbar() {
             )}
           </>
         ) : hasSearched ? (
-          <p className="text-spring-green-400 text-center">
+          <p className="text-white text-center">
             No recipes found. Try selecting different ingredients.
           </p>
         ) : null}

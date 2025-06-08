@@ -6,7 +6,7 @@ class Command(BaseCommand):
     help = "Import ingredients from ingredients.csv into IngredientAllData"
 
     def handle(self, *args, **kwargs):
-        with open('resources/ingredients.csv', encoding='utf-8') as f:
+        with open('resources/model_ingredients.csv', encoding='utf-8') as f:
             reader = csv.reader(f)
             for row in reader:
                 if not row or not row[0].strip():
