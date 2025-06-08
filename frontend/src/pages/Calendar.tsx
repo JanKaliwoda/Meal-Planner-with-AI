@@ -95,7 +95,7 @@ useEffect(() => {
 
     // Update states with current date
     setCurrentMonth(today.toLocaleString('default', { month: 'long', year: 'numeric' }))
-    setCurrentDate(`${today.toLocaleString('default', { month: 'long' })} ${today.getDate()}`)
+    setCurrentDate(`${today.getDate()} ${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`)
     setWeekDates(getWeekDates(startOfWeek))
 
     // Fetch meals
@@ -204,7 +204,7 @@ useEffect(() => {
   
   setCurrentDateObj(newDate)
   setCurrentMonth(newDate.toLocaleString('default', { month: 'long', year: 'numeric' }))
-  setCurrentDate(`${newDate.toLocaleString('default', { month: 'long' })} ${newDate.getDate()}`)
+  setCurrentDate(`${newDate.getDate()} ${newDate.toLocaleString('default', { month: 'long' })} ${newDate.getFullYear()}`)
   
   const startOfWeek = new Date(newDate)
   startOfWeek.setDate(newDate.getDate() - newDate.getDay())
@@ -217,7 +217,7 @@ const handleNextWeek = () => {
   
   setCurrentDateObj(newDate)
   setCurrentMonth(newDate.toLocaleString('default', { month: 'long', year: 'numeric' }))
-  setCurrentDate(`${newDate.toLocaleString('default', { month: 'long' })} ${newDate.getDate()}`)
+  setCurrentDate(`${newDate.getDate()} ${newDate.toLocaleString('default', { month: 'long' })} ${newDate.getFullYear()}`)
   
   const startOfWeek = new Date(newDate)
   startOfWeek.setDate(newDate.getDate() - newDate.getDay())
@@ -244,7 +244,7 @@ useEffect(() => {
 
   // Update states with current date
   setCurrentMonth(today.toLocaleString('default', { month: 'long', year: 'numeric' }))
-  setCurrentDate(`${today.toLocaleString('default', { month: 'long' })} ${today.getDate()}`)
+  setCurrentDate(`${today.getDate()} ${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`)
   setWeekDates(getWeekDates(startOfWeek))
 
   // Fetch meals
@@ -260,13 +260,18 @@ const handleToday = () => {
   startOfWeek.setDate(today.getDate() - today.getDay())
   
   setCurrentMonth(today.toLocaleString('default', { month: 'long', year: 'numeric' }))
-  setCurrentDate(`${today.toLocaleString('default', { month: 'long' })} ${today.getDate()}`)
+  setCurrentDate(`${today.getDate()} ${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`)
   setWeekDates(getWeekDates(startOfWeek))
 }
 
   const handleEventClick = (event: CalendarEvent) => {
     setSelectedEvent(event)
   }
+
+  // Add this helper function before the return statement
+const uniqueUserMeals = userMeals.filter((meal, index, self) =>
+  index === self.findIndex((m) => m.recipe.name === meal.recipe.name)
+)
 
   return (
     <div className="relative min-h-screen bg-gunmetal-500">
@@ -305,20 +310,12 @@ const handleToday = () => {
   <div className="flex-1 overflow-y-auto">
     <h3 className="text-spring-green-400 font-medium mb-3">My Meals</h3>
     <div className="space-y-2">
-      {userMeals.map((meal, index) => (
+      {uniqueUserMeals.map((meal, index) => (
         <div
           key={index}
           className="bg-gunmetal-300 border border-office-green-500 rounded-lg p-2 cursor-pointer hover:bg-emerald-500/20 transition-colors"
           onClick={() => setSelectedEvent(meal)}
         >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-spring-green-400/70">
-              {meal.meal_type.toUpperCase()}
-            </span>
-            <span className="text-xs text-spring-green-400/70">
-              {new Date(meal.date).toLocaleDateString()}
-            </span>
-          </div>
           <h4 className="text-sm font-medium text-spring-green-400 truncate">
             {meal.recipe.name}
           </h4>
@@ -456,9 +453,7 @@ const handleToday = () => {
           <h2 className="text-xl font-bold text-spring-green-400">
             {selectedEvent.recipe.name}
           </h2>
-          <span className="text-xs text-spring-green-400/70 px-2 py-1 bg-gunmetal-400 rounded-full">
-            {selectedEvent.meal_type.toUpperCase()}
-          </span>
+          
         </div>
         
         <div className="space-y-4 text-white">

@@ -9,13 +9,15 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         with open('resources/test_dataset.csv', encoding='utf-8') as f:
             reader = csv.DictReader(f)
+            counter = 1
             for row in reader:
                 name = row['title'].strip()
-                description = row['ingredients']  # description now equals ingredients column
-                steps = "\n".join(ast.literal_eval(row['directions']))  # steps equals directions
-                ingredient_names = ast.literal_eval(row['NER'])  # ingredient_names equals NER column
+                description = row['ingredients']
+                steps = "\n".join(ast.literal_eval(row['directions']))
+                ingredient_names = ast.literal_eval(row['NER'])
+                
                 # Create Recipe
-                recipe, _ = Recipe.objects.get_or_create(
+                recipe, created = Recipe.objects.get_or_create(
                     name=name,
                     defaults={
                         'description': description,
@@ -23,6 +25,7 @@ class Command(BaseCommand):
                         'created_by_ai': False,
                     }
                 )
+
                 # Add ingredients to IngredientAllData and link to recipe
                 ingredient_objs = []
                 for ing_name in ingredient_names:
@@ -30,6 +33,12 @@ class Command(BaseCommand):
                         name=ing_name.strip()
                     )
                     ingredient_objs.append(ing)
-                recipe.ingredients.set(ingredient_objs)  # Link ingredients to recipe
+                recipe.ingredients.set(ingredient_objs)
                 recipe.save()
-        self.stdout.write(self.style.SUCCESS('Recipes imported successfully.'))
+
+                # Print progress message
+                status = "Added" if created else "Updated"
+                self.stdout.write(f"{status} recipe number {counter}: {name}")
+                counter += 1
+
+        self.stdout.write(self.style.SUCCESS(f'Successfully processed {counter-1} recipes.'))
