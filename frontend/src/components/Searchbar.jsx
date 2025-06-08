@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import api from "../api"
 import "../assets/layered-waves-haikei.svg"
@@ -14,9 +14,10 @@ function Searchbar() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [dynamicIngredients, setDynamicIngredients] = useState([]) // For API ingredients
   const recipesPerPage = 4
 
-  const allIngredients = [
+  const staticIngredients = [
     "egg",
     "milk",
     "cheese",
@@ -31,11 +32,30 @@ function Searchbar() {
     "rice",
     "carrot",
     "potato",
+    "garlic",
   ]
 
-  const filteredIngredients = allIngredients.filter((ingredient) =>
-    ingredient.toLowerCase().includes(searchInput.toLowerCase())
-  )
+  // Fetch ingredients from API when searchInput changes
+  useEffect(() => {
+    const fetchIngredients = async () => {
+      if (searchInput.trim() === "") {
+        setDynamicIngredients([]) // Reset to empty if search is cleared
+        return
+      }
+      try {
+        const response = await api.get(`/api/ingredient-all-data/?search=${searchInput}`)
+        setDynamicIngredients(response.data.map((item) => item.name)) // Extract ingredient names
+      } catch (error) {
+        console.error("Error fetching ingredients:", error)
+      }
+    }
+
+    fetchIngredients()
+  }, [searchInput])
+
+  // Determine which ingredients to display
+  const filteredIngredients =
+    searchInput.trim() === "" ? staticIngredients : dynamicIngredients
 
   const toggleIngredient = (ingredient) => {
     setSelectedIngredients((prev) =>

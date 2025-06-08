@@ -179,7 +179,9 @@ class IngredientViewSet(viewsets.ModelViewSet):
 class IngredientAllDataViewSet(viewsets.ModelViewSet):
     queryset = IngredientAllData.objects.all()
     serializer_class = IngredientAllDataSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+    filter_backends = [drf_filters.SearchFilter]
+    search_fields = ['name']
 
 #  Recipe Management
 class RecipeViewSet(viewsets.ModelViewSet):
