@@ -299,10 +299,7 @@ const handleToday = () => {
   } flex flex-col`}
   style={{ animationDelay: "0.4s" }}
 >
-  <button className="mb-6 flex items-center justify-center gap-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors w-full px-4 py-3">
-    <span className="text-xl">+</span>
-    <span>Add New Meal</span>
-  </button>
+
 
   {/* User's Meals */}
   <div className="flex-1 overflow-y-auto">
@@ -392,14 +389,15 @@ const handleToday = () => {
 {/* Days Columns */}
 {Array.from({ length: 7 }).map((_, dayIndex) => (
   <div key={dayIndex} className="border-l border-white/20 relative">
-    {/* Meal slots at the top of each day */}
-    <div className="absolute top-0 left-0 right-0 flex flex-col gap-2 p-2">
-      {isLoading ? (
-        <div className="text-spring-green-400/70 text-sm">Loading...</div>
-      ) : (
-        events
-          .filter((event) => {
-            const eventDate = new Date(event.date);
+    {/* Meal slots container with fixed height and scrolling */}
+    <div className="absolute top-0 left-0 right-0 max-h-[calc(100vh-280px)] overflow-y-auto scrollbar-thin scrollbar-thumb-office-green-500 scrollbar-track-gunmetal-400">
+      <div className="flex flex-col gap-2 p-2">
+        {isLoading ? (
+          <div className="text-spring-green-400/70 text-sm">Loading...</div>
+        ) : (
+          events
+            .filter((event) => {
+              const eventDate = new Date(event.date);
     const columnDate = new Date(currentDateObj);
     columnDate.setDate(weekDates[dayIndex]);
     return (
@@ -407,13 +405,13 @@ const handleToday = () => {
       eventDate.getMonth() === columnDate.getMonth() &&
       eventDate.getFullYear() === columnDate.getFullYear()
     );
-          })
-          .sort((a, b) => {
-            const mealOrder = { breakfast: 0, lunch: 1, dinner: 2 };
-            return mealOrder[a.meal_type] - mealOrder[b.meal_type];
-          })
-          .map((event, i) => (
-            <SpotlightCard
+            })
+            .sort((a, b) => {
+              const mealOrder = { breakfast: 0, lunch: 1, dinner: 2 };
+              return mealOrder[a.meal_type] - mealOrder[b.meal_type];
+            })
+            .map((event, i) => (
+              <SpotlightCard
             key={i}
             className="w-full"
             spotlightColor="rgba(39, 251, 107, 0.2)"
@@ -434,6 +432,7 @@ const handleToday = () => {
           </SpotlightCard>
           ))
       )}
+      </div>
     </div>
   </div>
 ))}
@@ -450,7 +449,7 @@ const handleToday = () => {
   >
     <SpotlightCard>
       <div
-        className="bg-gunmetal-300 rounded-lg shadow-xl p-6 max-w-lg w-full"
+        className="bg-gunmetal-300 rounded-lg shadow-xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-start mb-4">
@@ -463,23 +462,26 @@ const handleToday = () => {
         </div>
         
         <div className="space-y-4 text-white">
-          <div className="bg-gunmetal-400/50 rounded-lg p-4">
-            <h3 className="text-spring-green-400 font-medium mb-2">Description</h3>
-            <p>{selectedEvent.recipe.description}</p>
-          </div>
 
           <div className="bg-gunmetal-400/50 rounded-lg p-4">
             <h3 className="text-spring-green-400 font-medium mb-2">Ingredients</h3>
-            <ul className="list-disc list-inside">
-              {selectedEvent.recipe.ingredients.map((ingredient, i) => (
-                <li key={i}>{ingredient.name}</li>
-              ))}
-            </ul>
+            <div className="max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-office-green-500 scrollbar-track-gunmetal-400">
+              <ul className="list-disc list-inside">
+                      {selectedEvent.recipe.description
+                        ? selectedEvent.recipe.description
+                            .replace(/[\[\]"]+/g, "")
+                            .split(",")
+                            .map((ing, idx) => <li key={idx}>{ing.trim()}</li>)
+                        : <li>No ingredients listed.</li>}
+                    </ul>
+            </div>
           </div>
 
           <div className="bg-gunmetal-400/50 rounded-lg p-4">
             <h3 className="text-spring-green-400 font-medium mb-2">Steps</h3>
-            <p className="whitespace-pre-line">{selectedEvent.recipe.steps}</p>
+            <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-office-green-500 scrollbar-track-gunmetal-400">
+              <p className="whitespace-pre-line">{selectedEvent.recipe.steps}</p>
+            </div>
           </div>
         </div>
 
