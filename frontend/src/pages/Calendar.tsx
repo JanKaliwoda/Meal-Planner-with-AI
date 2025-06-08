@@ -5,7 +5,7 @@ import backgroundImage from "../assets/layered-waves-haikei.svg"
 import Navbar from "../components/Navbar"
 import { useNavigate } from "react-router-dom"
 import SpotlightCard from "../components/SpotlightCard"
-import { ACCESS_TOKEN } from "../constants"
+import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants"
 import api from "../api"
 
 
@@ -103,6 +103,56 @@ useEffect(() => {
   }
 
   initializeCalendar()
+}, [])
+
+const [userMeals, setUserMeals] = useState<CalendarEvent[]>([])
+
+const fetchUserMeals = async () => {
+  try {
+    const token = localStorage.getItem(ACCESS_TOKEN)
+    if (!token) {
+      navigate('/login')
+      return
+    }
+
+    const response = await api.get('/api/meals/', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    // Convert meals to calendar events
+    const calendarEvents: CalendarEvent[] = response.data.map(meal => ({
+      id: meal.id,
+      recipe: meal.recipe,
+      date: meal.date,
+      meal_type: meal.meal_type,
+      user: meal.user
+    }))
+
+    setUserMeals(calendarEvents)
+  } catch (error) {
+    if (error.response?.status === 401) {
+      localStorage.removeItem(ACCESS_TOKEN)
+      localStorage.removeItem(REFRESH_TOKEN)
+      navigate('/login')
+    } else {
+      console.error('Error fetching user meals:', error)
+    }
+  }
+}
+
+// Update the useEffect to properly handle errors
+useEffect(() => {
+  const loadUserMeals = async () => {
+    try {
+      await fetchUserMeals()
+    } catch (error) {
+      console.error('Failed to load user meals:', error)
+    }
+  }
+
+  loadUserMeals()
 }, [])
 
 
@@ -243,40 +293,40 @@ const handleToday = () => {
           {/* Main Content */}
           <main className="relative h-screen w-full flex">
       {/* Sidebar */}
-      <div
-        className={`w-64 h-full bg-gunmetal-400/80 backdrop-blur-lg p-4 shadow-xl border-r border-office-green-500 rounded-tr-3xl opacity-0 ${
-          isLoaded ? "animate-fade-in" : ""
-        } flex flex-col justify-between`}
-        style={{ animationDelay: "0.4s" }}
-      >
-        <div>
-          <button className="mb-6 flex items-center justify-center gap-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors w-full px-4 py-3">
-            <span className="text-xl">+</span>
-            <span>Create</span>
-          </button>
-    
-                {/* Mini Calendar */}
-                <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-spring-green-400 font-medium">{currentMonth}</h3>
-              
-            </div>
+<div
+  className={`w-64 h-full bg-gunmetal-400/80 backdrop-blur-lg p-4 shadow-xl border-r border-office-green-500 rounded-tr-3xl opacity-0 ${
+    isLoaded ? "animate-fade-in" : ""
+  } flex flex-col`}
+  style={{ animationDelay: "0.4s" }}
+>
+
+
+  {/* User's Meals */}
+  <div className="flex-1 overflow-y-auto">
+    <h3 className="text-spring-green-400 font-medium mb-3">My Meals</h3>
+    <div className="space-y-2">
+      {userMeals.map((meal, index) => (
+        <div
+          key={index}
+          className="bg-gunmetal-300 border border-office-green-500 rounded-lg p-2 cursor-pointer hover:bg-emerald-500/20 transition-colors"
+          onClick={() => setSelectedEvent(meal)}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-spring-green-400/70">
+              {meal.meal_type.toUpperCase()}
+            </span>
+            <span className="text-xs text-spring-green-400/70">
+              {new Date(meal.date).toLocaleDateString()}
+            </span>
           </div>
-    
-                {/* My Calendars */}
-                <div>
-            <h3 className="text-spring-green-400 font-medium mb-3">📅 My calendars</h3>
-            <div className="space-y-2">
-              {myCalendars.map((cal, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-sm ${cal.color}`}></div>
-                  <span className="text-spring-green-400 text-sm">{cal.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <h4 className="text-sm font-medium text-spring-green-400 truncate">
+            {meal.recipe.name}
+          </h4>
         </div>
-      </div>
+      ))}
+    </div>
+  </div>
+</div>
     
             {/* Calendar View */}
             <div
@@ -314,9 +364,8 @@ const handleToday = () => {
         <div className="flex-1 overflow-auto p-4">
           <div className="bg-gunmetal-400/80 backdrop-blur-lg rounded-xl border border-office-green-500 shadow-xl h-full">
             {/* Week Header */}
-            <div className="grid grid-cols-8 border-b border-office-green-500">
-              <div className="p-2 text-center text-spring-green-400/50 text-xs"></div>
-              {weekDays.map((day, i) => (
+            <div className="grid grid-cols-7 border-b border-office-green-500">
+  {weekDays.map((day, i) => (
   <div key={i} className="p-2 text-center border-l border-office-green-500">
     <div className="text-xs text-spring-green-400/70 font-medium">{day}</div>
     <div className="h-10 flex items-center justify-center"> {/* Added fixed height container */}
@@ -335,27 +384,20 @@ const handleToday = () => {
             </div>
     
                   {/* Time Grid */}
-                  <div className="grid grid-cols-8">
-                    {/* Time Labels */}
-                    <div className="text-white/70">
-                      {timeSlots.map((time, i) => (
-                        <div key={i} className="h-20 border-b border-white/10 pr-2 text-right text-xs">
-                          {time > 12 ? `${time - 12} PM` : `${time} AM`}
-                        </div>
-                      ))}
-                    </div>
+                  <div className="grid grid-cols-7">
 
 {/* Days Columns */}
 {Array.from({ length: 7 }).map((_, dayIndex) => (
   <div key={dayIndex} className="border-l border-white/20 relative">
-    {/* Meal slots at the top of each day */}
-    <div className="absolute top-0 left-0 right-0 flex flex-col gap-2 p-2">
-      {isLoading ? (
-        <div className="text-spring-green-400/70 text-sm">Loading...</div>
-      ) : (
-        events
-          .filter((event) => {
-            const eventDate = new Date(event.date);
+    {/* Meal slots container with fixed height and scrolling */}
+    <div className="absolute top-0 left-0 right-0 max-h-[calc(100vh-280px)] overflow-y-auto scrollbar-thin scrollbar-thumb-office-green-500 scrollbar-track-gunmetal-400">
+      <div className="flex flex-col gap-2 p-2">
+        {isLoading ? (
+          <div className="text-spring-green-400/70 text-sm">Loading...</div>
+        ) : (
+          events
+            .filter((event) => {
+              const eventDate = new Date(event.date);
     const columnDate = new Date(currentDateObj);
     columnDate.setDate(weekDates[dayIndex]);
     return (
@@ -363,13 +405,13 @@ const handleToday = () => {
       eventDate.getMonth() === columnDate.getMonth() &&
       eventDate.getFullYear() === columnDate.getFullYear()
     );
-          })
-          .sort((a, b) => {
-            const mealOrder = { breakfast: 0, lunch: 1, dinner: 2 };
-            return mealOrder[a.meal_type] - mealOrder[b.meal_type];
-          })
-          .map((event, i) => (
-            <SpotlightCard
+            })
+            .sort((a, b) => {
+              const mealOrder = { breakfast: 0, lunch: 1, dinner: 2 };
+              return mealOrder[a.meal_type] - mealOrder[b.meal_type];
+            })
+            .map((event, i) => (
+              <SpotlightCard
             key={i}
             className="w-full"
             spotlightColor="rgba(39, 251, 107, 0.2)"
@@ -390,6 +432,7 @@ const handleToday = () => {
           </SpotlightCard>
           ))
       )}
+      </div>
     </div>
   </div>
 ))}
@@ -406,7 +449,7 @@ const handleToday = () => {
   >
     <SpotlightCard>
       <div
-        className="bg-gunmetal-300 rounded-lg shadow-xl p-6 max-w-lg w-full"
+        className="bg-gunmetal-300 rounded-lg shadow-xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-start mb-4">
@@ -419,23 +462,26 @@ const handleToday = () => {
         </div>
         
         <div className="space-y-4 text-white">
-          <div className="bg-gunmetal-400/50 rounded-lg p-4">
-            <h3 className="text-spring-green-400 font-medium mb-2">Description</h3>
-            <p>{selectedEvent.recipe.description}</p>
-          </div>
 
           <div className="bg-gunmetal-400/50 rounded-lg p-4">
             <h3 className="text-spring-green-400 font-medium mb-2">Ingredients</h3>
-            <ul className="list-disc list-inside">
-              {selectedEvent.recipe.ingredients.map((ingredient, i) => (
-                <li key={i}>{ingredient.name}</li>
-              ))}
-            </ul>
+            <div className="max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-office-green-500 scrollbar-track-gunmetal-400">
+              <ul className="list-disc list-inside">
+                      {selectedEvent.recipe.description
+                        ? selectedEvent.recipe.description
+                            .replace(/[\[\]"]+/g, "")
+                            .split(",")
+                            .map((ing, idx) => <li key={idx}>{ing.trim()}</li>)
+                        : <li>No ingredients listed.</li>}
+                    </ul>
+            </div>
           </div>
 
           <div className="bg-gunmetal-400/50 rounded-lg p-4">
             <h3 className="text-spring-green-400 font-medium mb-2">Steps</h3>
-            <p className="whitespace-pre-line">{selectedEvent.recipe.steps}</p>
+            <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-office-green-500 scrollbar-track-gunmetal-400">
+              <p className="whitespace-pre-line">{selectedEvent.recipe.steps}</p>
+            </div>
           </div>
         </div>
 

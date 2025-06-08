@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { ACCESS_TOKEN } from "../constants"
 import api from "../api"
+import DatePicker from "react-datepicker"
+import "react-datepicker/dist/react-datepicker.css"
 import "../assets/layered-waves-haikei.svg"
 import SpotlightCard from "./SpotlightCard"
 
@@ -17,6 +20,10 @@ function Searchbar() {
   const [dynamicIngredients, setDynamicIngredients] = useState([])
   const [filteredIngredients, setFilteredIngredients] = useState([])
   const [showNoIngredientsMessage, setShowNoIngredientsMessage] = useState(false)
+  const [showAddMealModal, setShowAddMealModal] = useState(false)
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [isAddingMeal, setIsAddingMeal] = useState(false)
+  const [selectedMealType, setSelectedMealType] = useState('dinner')
   const recipesPerPage = 4
 
   const staticIngredients = [
@@ -158,6 +165,44 @@ function Searchbar() {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
   }
 
+  // Add function to handle meal creation
+  const handleAddMeal = async () => {
+    setIsAddingMeal(true)
+    try {
+      const token = localStorage.getItem(ACCESS_TOKEN)
+      if (!token) {
+        navigate('/login')
+        return
+      }
+
+      const response = await api.post('/api/meals/', {
+        recipe_id: selectedRecipe.id,
+        date: selectedDate.toISOString().split('T')[0],
+        meal_type: selectedMealType // Use the selected meal type
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (response.status === 201) {
+        setShowAddMealModal(false)
+        // Show success message or update UI
+        alert('Meal added successfully!')
+      }
+    } catch (error) {
+      if (error.response?.status === 401) {
+        localStorage.removeItem(ACCESS_TOKEN)
+        navigate('/login')
+      } else {
+        console.error('Error adding meal:', error)
+        alert('Failed to add meal')
+      }
+    } finally {
+      setIsAddingMeal(false)
+    }
+  }
+
   return (
     <div className="bg-gunmetal-500/0">
       <div className="">
@@ -187,7 +232,7 @@ function Searchbar() {
               type="search"
               id="default-search"
               value={searchInput}
-              autoComplete="false"
+              autoComplete="off"
               onChange={(e) => setSearchInput(e.target.value)}
               className="block w-full p-4 ps-5 placeholder-office-green-600 text-sm text-spring-green-500 border-2 border-office-green-500 rounded-full bg-gray-50/0 focus:ring-emerald-500 focus:border-spring-green-500 [&::-webkit-search-cancel-button]:appearance-none"
               placeholder="Search Ingredients..."
@@ -315,37 +360,58 @@ function Searchbar() {
       {/* Recipe Modal */}
       {isModalOpen && selectedRecipe && (
         <div
-          className="fixed inset-0 bg-opacity-50 flex justify-center items-center z-50 transition-opacity duration-300"
+          className="fixed inset-0 bg-gunmetal-500/80 backdrop-blur-sm flex justify-center items-center z-50"
           onClick={closeModal}
-          style={{ animation: isModalOpen ? "fadeIn 0.3s" : "fadeOut 0.3s" }}
         >
           <SpotlightCard>
             <div
               className="bg-gunmetal-300 rounded-lg shadow-xl p-6 max-w-lg w-full"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-xl font-bold text-spring-green-400 mb-4">
-                {selectedRecipe.name}
-              </h2>
-              <p className="text-spring-green-400 font-bold mb-1">Ingredients:</p>
-              <ul className="mb-4 text-white list-disc list-inside">
-                {selectedRecipe.description
-                  ? selectedRecipe.description
-                      .replace(/[\[\]"]+/g, "")
-                      .split(",")
-                      .map((ing, idx) => <li key={idx}>{ing.trim()}</li>)
-                  : <li>No ingredients listed.</li>}
-              </ul>
-              <p className="text-spring-green-400 font-bold mb-1">Description:</p>
-              <div className="text-white mb-4 whitespace-pre-line">
-                {selectedRecipe.steps
-                  ? selectedRecipe.steps
-                      .split(/;\s*|\n/)
-                      .filter((line) => line.trim() !== "")
-                      .map((line, idx) => <div key={idx}>{line.trim()}</div>)
-                  : "No description available."}
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="text-xl font-bold text-spring-green-400">
+                  {selectedRecipe.name}
+                </h2>
               </div>
-              <div className="flex justify-end">
+              
+              <div className="flex flex-col gap-4">
+
+                <div className="bg-gunmetal-400/50 rounded-lg p-4">
+                  <h3 className="text-spring-green-400 font-medium mb-2">Ingredients</h3>
+                  <div className="max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-office-green-500 scrollbar-track-gunmetal-400">
+                    <ul className="list-disc list-inside">
+                      {selectedRecipe.description
+                        ? selectedRecipe.description
+                            .replace(/[\[\]"]+/g, "")
+                            .split(",")
+                            .map((ing, idx) => <li key={idx}>{ing.trim()}</li>)
+                        : <li>No ingredients listed.</li>}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-gunmetal-400/50 rounded-lg p-4">
+                  <h3 className="text-spring-green-400 font-medium mb-2">Steps</h3>
+                  <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-office-green-500 scrollbar-track-gunmetal-400">
+                    <div className="whitespace-pre-line">
+                      {selectedRecipe.steps
+                        ? selectedRecipe.steps
+                            .split(/;\s*|\n/)
+                            .filter((line) => line.trim() !== "")
+                            .map((line, idx) => <div key={idx}>{line.trim()}</div>)
+                        : "No description available."}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between mt-6">
+                <button
+                  onClick={() => setShowAddMealModal(true)}
+                  className="px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors"
+                >
+                  Add Recipe
+                </button>
                 <button
                   onClick={closeModal}
                   className="px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors"
@@ -355,6 +421,68 @@ function Searchbar() {
               </div>
             </div>
           </SpotlightCard>
+        </div>
+      )}
+
+      {/* Add Meal Modal */}
+      {showAddMealModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
+          onClick={() => setShowAddMealModal(false)}
+        >
+          <div
+            className="bg-gunmetal-300 rounded-lg shadow-xl p-6 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-spring-green-400 mb-4">
+              Add Recipe to Calendar
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-spring-green-400 text-sm font-bold mb-2">
+                  Select Date
+                </label>
+                <DatePicker
+                  selected={selectedDate}
+                  onChange={(date) => setSelectedDate(date)}
+                  className="w-full px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white"
+                  dateFormat="yyyy-MM-dd"
+                />
+              </div>
+
+              <div>
+          <label className="block text-spring-green-400 text-sm font-bold mb-2">
+            Select Meal Type
+          </label>
+          <select
+            value={selectedMealType}
+            onChange={(e) => setSelectedMealType(e.target.value)}
+            className="w-full px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white"
+          >
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">Lunch</option>
+            <option value="dinner">Dinner</option>
+          </select>
+        </div>
+            </div>
+
+            <div className="flex justify-end gap-4 mt-6">
+              <button
+                onClick={() => setShowAddMealModal(false)}
+                className="px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddMeal}
+                disabled={isAddingMeal}
+                className="px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors disabled:opacity-50"
+              >
+                {isAddingMeal ? 'Adding...' : 'Add to Calendar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
