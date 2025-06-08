@@ -64,8 +64,23 @@ function Searchbar() {
 	useEffect(() => {
 		const ingredients =
 			searchInput.trim() === "" ? staticIngredients : dynamicIngredients
-		setFilteredIngredients(ingredients)
-	}, [searchInput, dynamicIngredients])
+
+		// Combine selected ingredients with the current ingredients
+		const combinedIngredients = Array.from(
+			new Set([...selectedIngredients, ...ingredients])
+		)
+
+		// Sort ingredients to show selected ones first
+		const sortedIngredients = [...combinedIngredients].sort((a, b) => {
+			const isASelected = selectedIngredients.includes(a)
+			const isBSelected = selectedIngredients.includes(b)
+			if (isASelected && !isBSelected) return -1 // a comes first
+			if (!isASelected && isBSelected) return 1 // b comes first
+			return 0 // no change in order
+		})
+
+		setFilteredIngredients(sortedIngredients)
+	}, [searchInput, dynamicIngredients, selectedIngredients])
 
 	// Show "No ingredients found" message after a delay if no ingredients are available
 	useEffect(() => {
