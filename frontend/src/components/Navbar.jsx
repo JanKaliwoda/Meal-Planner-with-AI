@@ -3,10 +3,14 @@ import { Link } from "react-router-dom"
 import profilePic from "../assets/profile_picture.jpg"
 import api from "../api"
 
-function Navbar() {
+function Navbar({ onSidebarChange }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [username, setUsername] = useState("")
   const [firstName, setFirstName] = useState("")
+
+  useEffect(() => {
+    onSidebarChange?.(sidebarOpen)
+  }, [sidebarOpen])
 
   useEffect(() => {
     // Fetch user profile when component mounts
@@ -27,7 +31,9 @@ function Navbar() {
   return (
     <>
       {/* Navbar */}
-      <div className="navbar bg-gunmetal-500 flex items-center px-2 z-50 relative">
+<div className={`navbar flex items-center px-2 z-50 relative ${
+  sidebarOpen ? 'bg-gunmetal-500/0 ' : 'bg-gunmetal-500'
+}`}>
         <div className="flex-none">
           <button
             className="btn btn-square btn-ghost w-12 h-12 hover:bg-emerald-500/50"
@@ -91,11 +97,11 @@ function Navbar() {
 
       {/* Sidebar Overlay */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-gunmetal-100/80 z-40"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <div
+        className="fixed inset-0 bg-gunmetal-300/80 backdrop-blur-sm z-40"
+        onClick={() => setSidebarOpen(false)}
+      />
+    )}
 
       {/* Sidebar */}
       <div
