@@ -39,6 +39,47 @@ class Ingredient(models.Model):
     
 class IngredientAllData(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    # Dietary/allergy information for filtering
+    contains_allergens = models.ManyToManyField(Allergy, blank=True, related_name='ingredients')
+    dietary_preferences = models.ManyToManyField(DietaryPreference, blank=True, related_name='ingredients')
+    
+    # Additional fields for better data management
+    is_verified = models.BooleanField(default=False, help_text="Whether this ingredient has been manually verified")
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+    
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Ingredient'
+        verbose_name_plural = 'Ingredients'
+    
+    def clean(self):
+        """Custom validation for ingredient names"""
+        from django.core.exceptions import ValidationError
+        import re
+        
+        if self.name:
+            # Clean the name
+            cleaned_name = self.name.strip().title()
+            
+            # Basic validation rules
+            if len(cleaned_name) < 2:
+                raise ValidationError('Ingredient name must be at least 2 characters long.')
+            
+            # Check for numbers at the start (likely measurements, not ingredient names)
+            if re.match(r'^\d', cleaned_name):
+                raise ValidationError('Ingredient name cannot start with a number.')
+            
+            # Check for obvious non-food terms
+            non_food_terms = ['tsp', 'tbsp', 'cup', 'oz', 'lb', 'kg', 'ml', 'l', 'liter']
+            if any(term in cleaned_name.lower() for term in non_food_terms):
+                raise ValidationError('Ingredient name appears to contain measurement units.')
+            
+            self.name = cleaned_name
+    
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -51,6 +92,9 @@ class Recipe(models.Model):
     ingredients = models.ManyToManyField('IngredientAllData', related_name='recipes')
     created_by_ai = models.BooleanField(default=False)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    # Dietary/allergy information for filtering
+    contains_allergens = models.ManyToManyField(Allergy, blank=True, related_name='recipes')
+    suitable_for_diets = models.ManyToManyField(DietaryPreference, blank=True, related_name='recipes')
 
     def __str__(self):
         return self.name

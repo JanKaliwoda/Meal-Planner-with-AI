@@ -12,6 +12,12 @@ function Account() {
   const [newPassword, setNewPassword] = useState("")
   const [newPassword2, setNewPassword2] = useState("")
 
+  // Dietary preferences and allergies state
+  const [availableDietaryPreferences, setAvailableDietaryPreferences] = useState([])
+  const [availableAllergies, setAvailableAllergies] = useState([])
+  const [selectedDietaryPreferences, setSelectedDietaryPreferences] = useState([])
+  const [selectedAllergies, setSelectedAllergies] = useState([])
+
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -28,6 +34,17 @@ function Account() {
         console.error("Failed to load user", err)
         setLoading(false)
       })
+
+    // Fetch dietary preferences and allergies
+    api.get("/api/dietary-preferences/").then(res => setAvailableDietaryPreferences(res.data))
+    api.get("/api/allergies/").then(res => setAvailableAllergies(res.data))
+    // Fetch user profile for preferences/allergies
+    api.get("/api/user-profiles/").then(res => {
+      if (res.data.length > 0) {
+        setSelectedDietaryPreferences(res.data[0].dietary_preferences || [])
+        setSelectedAllergies(res.data[0].allergies || [])
+      }
+    })
   }, [])
 
   const handleSave = async (e) => {
@@ -76,6 +93,40 @@ function Account() {
       alert(detail)
       console.error(err)
     }
+  }
+
+  const handlePreferencesSave = async (e) => {
+    e.preventDefault()
+    try {
+      // PATCH the first user profile (assumes one per user)
+      const userProfiles = await api.get("/api/user-profiles/")
+      if (userProfiles.data.length > 0) {
+        await api.patch(`/api/user-profiles/${userProfiles.data[0].id}/`, {
+          dietary_preferences: selectedDietaryPreferences,
+          allergies: selectedAllergies,
+        })
+        alert("Preferences and allergies updated!")
+      }
+    } catch (error) {
+      console.error("Failed to update preferences", error)
+      alert("Failed to update preferences. Please try again.")
+    }
+  }
+
+  const toggleDietaryPreference = (prefId) => {
+    setSelectedDietaryPreferences(prev => 
+      prev.includes(prefId) 
+        ? prev.filter(id => id !== prefId)
+        : [...prev, prefId]
+    )
+  }
+
+  const toggleAllergy = (allergyId) => {
+    setSelectedAllergies(prev => 
+      prev.includes(allergyId) 
+        ? prev.filter(id => id !== allergyId)
+        : [...prev, allergyId]
+    )
   }
 
   if (loading) return <div>Loading...</div>
@@ -219,6 +270,128 @@ function Account() {
                     className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-full transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
                   >
                     {loading ? "Loading..." : "Change Password"}
+                  </button>
+                </div>
+              </fieldset>
+            </form>
+          </div>
+
+          {/* Dietary Preferences and Allergies Form */}
+          <div className="mt-6">
+            <form onSubmit={handlePreferencesSave} className="w-full">
+              <fieldset className="bg-gunmetal-300 shadow-xl rounded-lg px-5 pt-3 pb-5">
+                <legend className="text-lg font-bold text-spring-green-500 mb-3 text-center">
+                  Dietary Preferences & Allergies
+                </legend>
+                
+                {/* Dietary Preferences Section */}
+                <div className="mb-5">
+                  <h3 className="text-base font-semibold text-spring-green-400 mb-2 flex items-center">
+                    Dietary Preferences
+                  </h3>
+                  <p className="text-gray-300 text-sm mb-3">Click to select your dietary preferences (multiple selections allowed)</p>
+                  <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+                    {availableDietaryPreferences.map(pref => {
+                      const isSelected = selectedDietaryPreferences.includes(pref.id)
+                      return (
+                        <button
+                          key={pref.id}
+                          type="button"
+                          onClick={() => toggleDietaryPreference(pref.id)}
+                          className={`
+                            px-3 py-2 rounded-md border transition-all duration-200 text-sm font-medium
+                            ${isSelected 
+                              ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm' 
+                              : 'bg-gunmetal-400 border-office-green-500 text-white hover:bg-emerald-500/20 hover:border-emerald-400'
+                            }
+                          `}
+                        >
+                          <div className="flex items-center justify-center">
+                            {isSelected && <span className="mr-1">✓</span>}
+                            {pref.name}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {selectedDietaryPreferences.length > 0 && (
+                    <div className="mt-2 p-1.5 bg-emerald-500/10 rounded border border-emerald-500/30">
+                      <p className="text-emerald-400 text-xs">
+                        <span className="font-semibold">Selected:</span> {
+                          availableDietaryPreferences
+                            .filter(pref => selectedDietaryPreferences.includes(pref.id))
+                            .map(pref => pref.name)
+                            .join(', ')
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Allergies Section */}
+                <div className="mb-5">
+                  <h3 className="text-base font-semibold text-red-400 mb-2 flex items-center">
+                    Allergies & Intolerances
+                  </h3>
+                  <p className="text-gray-300 text-sm mb-3">Select all allergies and intolerances you have (multiple selections allowed)</p>
+                  <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+                    {availableAllergies.map(allergy => {
+                      const isSelected = selectedAllergies.includes(allergy.id)
+                      return (
+                        <button
+                          key={allergy.id}
+                          type="button"
+                          onClick={() => toggleAllergy(allergy.id)}
+                          className={`
+                            px-3 py-2 rounded-md border transition-all duration-200 text-sm font-medium
+                            ${isSelected 
+                              ? 'bg-red-500 border-red-400 text-white shadow-sm' 
+                              : 'bg-gunmetal-400 border-red-400/50 text-white hover:bg-red-500/20 hover:border-red-400'
+                            }
+                          `}
+                        >
+                          <div className="flex items-center justify-center">
+                            {isSelected && <span className="mr-1"></span>}
+                            {allergy.name}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {selectedAllergies.length > 0 && (
+                    <div className="mt-2 p-1.5 bg-red-500/10 rounded border border-red-500/30">
+                      <p className="text-red-400 text-xs">
+                        <span className="font-semibold">Allergies:</span> {
+                          availableAllergies
+                            .filter(allergy => selectedAllergies.includes(allergy.id))
+                            .map(allergy => allergy.name)
+                            .join(', ')
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Save Button */}
+                <div className="flex justify-center">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-spring-green-500 hover:from-emerald-600 hover:to-spring-green-600 text-white font-semibold text-sm rounded-full transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                  >
+                    {loading ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        Save Preferences & Allergies
+                      </div>
+                    )}
                   </button>
                 </div>
               </fieldset>

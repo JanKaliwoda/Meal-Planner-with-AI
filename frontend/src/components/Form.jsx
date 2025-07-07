@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { GoogleLogin } from "@react-oauth/google" // 👈 Google login
 import api from "../api"
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants"
+import PreferencesPopup from "./PreferencesPopup"
 import "../styles/index.css"
 
 function Form({ route, method, onLogin }) {
@@ -13,6 +14,7 @@ function Form({ route, method, onLogin }) {
   const [password, setPassword] = useState("")
   const [password2, setPassword2] = useState("")
   const [loading, setLoading] = useState(false)
+  const [showPreferencesPopup, setShowPreferencesPopup] = useState(false)
   const navigate = useNavigate()
 
   const name = method === "login" ? "Login" : "Register"
@@ -52,7 +54,19 @@ function Form({ route, method, onLogin }) {
         if (onLogin) await onLogin() // <-- Call the callback here
         navigate("/")
       } else {
-        navigate("/login")
+        // For registration, automatically log in the user and show preferences popup
+        try {
+          const loginRes = await api.post("/api/token/", {
+            username,
+            password
+          })
+          localStorage.setItem(ACCESS_TOKEN, loginRes.data.access)
+          localStorage.setItem(REFRESH_TOKEN, loginRes.data.refresh)
+          setShowPreferencesPopup(true)
+        } catch (loginError) {
+          console.error("Auto-login after registration failed:", loginError)
+          navigate("/login")
+        }
       }
     } catch (error) {
       console.error("Form error:", error)
@@ -62,6 +76,17 @@ function Form({ route, method, onLogin }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Handle preferences popup
+  const handlePreferencesComplete = () => {
+    setShowPreferencesPopup(false)
+    navigate("/")
+  }
+
+  const handlePreferencesClose = () => {
+    setShowPreferencesPopup(false)
+    navigate("/")
   }
 
   return (
@@ -192,6 +217,50 @@ function Form({ route, method, onLogin }) {
 
                     localStorage.setItem(ACCESS_TOKEN, res.data.access)
                     localStorage.setItem(REFRESH_TOKEN, res.data.refresh)
+                    
+                    // Check if user has preferences set (to determine if they're new)
+                    try {
+                      const userProfiles = await api.get("/api/user-profiles/")
+                      console.log("User profiles response:", userProfiles.data) // Debug log
+                      
+                      // Get current user info to find their profile
+                      const userInfo = await api.get("/api/user/profile/")
+                      console.log("Current user info:", userInfo.data) // Debug log
+                      
+                      // Find the profile that belongs to the current user
+                      const currentUserProfile = userProfiles.data.find(profile => 
+                        profile.user.id === userInfo.data.id
+                      )
+                      
+                      console.log("Current user profile:", currentUserProfile) // Debug log
+                      
+                      if (currentUserProfile) {
+                        console.log("Dietary preferences:", currentUserProfile.dietary_preferences) // Debug log
+                        console.log("Allergies:", currentUserProfile.allergies) // Debug log
+                        
+                        // If user has no preferences/allergies set, show the popup
+                        if ((!currentUserProfile.dietary_preferences || currentUserProfile.dietary_preferences.length === 0) && 
+                            (!currentUserProfile.allergies || currentUserProfile.allergies.length === 0)) {
+                          console.log("Showing preferences popup") // Debug log
+                          setShowPreferencesPopup(true)
+                          return // Don't navigate yet, wait for popup completion
+                        } else {
+                          console.log("User has preferences, skipping popup") // Debug log
+                        }
+                      } else {
+                        // No profile found for current user, definitely a new user
+                        console.log("No profile found for current user, showing popup") // Debug log
+                        setShowPreferencesPopup(true)
+                        return
+                      }
+                    } catch (profileError) {
+                      console.error("Error checking user profile:", profileError)
+                      // If we can't check, assume they're new and show popup
+                      console.log("Error checking profile, showing popup") // Debug log
+                      setShowPreferencesPopup(true)
+                      return
+                    }
+                    
                     navigate("/")
                   } catch (err) {
                     console.error("Google login error", err)
@@ -206,6 +275,15 @@ function Form({ route, method, onLogin }) {
           </fieldset>
         </form>
       </div>
+
+      {/* Render the preferences popup */}
+      {showPreferencesPopup && (
+        <PreferencesPopup
+          isOpen={showPreferencesPopup}
+          onComplete={handlePreferencesComplete}
+          onClose={handlePreferencesClose}
+        />
+      )}
     </div>
   )
 }
