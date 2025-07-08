@@ -18,8 +18,8 @@ from app.views import (
     ShoppingListItemViewSet,
     MealStatsView,
     IngredientAllDataViewSet,
-    GlobalIngredientSearchView,
-    AIRecipeSearchView,
+    IngredientAllDataUnfilteredViewSet,
+    RecipeSearchView,
     matching_recipes
 )
 
@@ -33,6 +33,7 @@ router.register('meals', MealViewSet, basename='meal')
 router.register('shopping-lists', ShoppingListViewSet, basename='shopping-list')
 router.register('shopping-list-items', ShoppingListItemViewSet, basename='shopping-list-item')
 router.register('ingredient-all-data', IngredientAllDataViewSet, basename='ingredient-all-data')
+router.register('ingredient-all-data-unfiltered', IngredientAllDataUnfilteredViewSet, basename='ingredient-all-data-unfiltered')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -45,10 +46,9 @@ urlpatterns = [
     
     path('api/', include(router.urls)),
     path("api/stats/summary/", MealStatsView.as_view(), name="meal-stats"),
-    path("api/ingredient-search/", GlobalIngredientSearchView.as_view(), name="ingredient-search"),
     path("api/matching-recipes/", matching_recipes, name="matching-recipes"),
 
-    path('api/ai-recipe-search/', AIRecipeSearchView.as_view(), name='ai-recipe-search'),
+    path('api/recipe-search/', RecipeSearchView.as_view(), name='recipe-search'),
 
     path("api/user/google-login/", GoogleLoginView.as_view(), name="google-login"),
 ]

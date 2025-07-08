@@ -58,8 +58,8 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    dietary_preferences = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=DietaryPreference.objects.all(), required=False
+    dietary_preference = serializers.PrimaryKeyRelatedField(
+        queryset=DietaryPreference.objects.all(), required=False, allow_null=True
     )
     allergies = serializers.PrimaryKeyRelatedField(
         many=True, queryset=Allergy.objects.all(), required=False
@@ -67,7 +67,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ["id", "user", "dietary_preferences", "allergies"]
+        fields = ["id", "user", "dietary_preference", "allergies"]
 
 
 
@@ -108,9 +108,9 @@ class MealSerializer(serializers.ModelSerializer):
 
 
 class ShoppingListItemSerializer(serializers.ModelSerializer):
-    ingredient = IngredientSerializer(read_only=True)
+    ingredient = IngredientAllDataSerializer(read_only=True)
     ingredient_id = serializers.PrimaryKeyRelatedField(
-        queryset=Ingredient.objects.all(),
+        queryset=IngredientAllData.objects.all(),
         source='ingredient',
         write_only=True
     )

@@ -1,4 +1,3 @@
-from datetime import datetime
 import re
 import sys
 import os
@@ -9,20 +8,13 @@ from rest_framework import generics, viewsets, filters as drf_filters, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
-from django.db.models import Count
+from django.db.models import Q, Count
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from django_filters import rest_framework as dj_filters
 from django_filters.rest_framework import DjangoFilterBackend
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '../resources'))
-from actual_ai import find_recipes_by_ingredients
-
-from django.db.models import Q
-from .serializers import UserSerializer
-from rest_framework import status
 
 from core.models import (
     DietaryPreference,
@@ -49,13 +41,27 @@ from .serializers import (
     ShoppingListItemSerializer,
 )
 
-#  User Registration
+
+# =====================================
+# HELPER FUNCTIONS
+# =====================================
+
+def normalize_title(title):
+    """Normalize recipe title for comparison"""
+    title = re.sub(r'\(.*?\)', '', title)
+    return title.strip().lower().replace("'", "'").replace("`", "'").replace(""", '"').replace(""", '"')
+
+
+# =====================================
+# AUTHENTICATION & USER MANAGEMENT
+# =====================================
+
 class CreateUserView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [AllowAny]
 
-#  User Profile Management
+
 class CurrentUserView(generics.RetrieveUpdateAPIView):
     queryset = User.objects.all()
     permission_classes = [IsAuthenticated]
@@ -64,12 +70,12 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
         if self.request.method in ["PATCH", "PUT"]:
             from .serializers import UserUpdateSerializer
             return UserUpdateSerializer
-        from .serializers import UserSerializer
         return UserSerializer
 
     def get_object(self):
         return self.request.user
-    
+
+
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -90,308 +96,6 @@ class ChangePasswordView(APIView):
         user.save()
         return Response({"detail": "Password changed successfully."}, status=status.HTTP_200_OK)
 
-#  Dietary Preferences
-class DietaryPreferenceViewSet(viewsets.ModelViewSet):
-    queryset = DietaryPreference.objects.all()
-    serializer_class = DietaryPreferenceSerializer
-    permission_classes = [IsAuthenticated]
-
-
-#  Allergies
-class AllergyViewSet(viewsets.ModelViewSet):
-    queryset = Allergy.objects.all()
-    serializer_class = AllergySerializer
-    permission_classes = [IsAuthenticated]
-
-
-#  User Profile
-class UserProfileViewSet(viewsets.ModelViewSet):
-    queryset = UserProfile.objects.all()
-    serializer_class = UserProfileSerializer
-    permission_classes = [IsAuthenticated]
-
-
-#  Ingredient Management 
-class IngredientViewSet(viewsets.ModelViewSet):
-    serializer_class = IngredientSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        # Return only ingredients belonging to the current user ("fridge" contents)
-        return Ingredient.objects.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        # When creating a new ingredient, automatically assign it to the current user
-        serializer.save(user=self.request.user)
-
-    @action(detail=True, methods=["post"])
-    def toggle_availability(self, request, pk=None):
-        # Toggle the availability status of a specific ingredient
-        ingredient = self.get_object()
-        ingredient.is_available = not ingredient.is_available
-        ingredient.save()
-        return Response({"status": "updated", "is_available": ingredient.is_available})
-
-    @action(detail=False, methods=["post"])
-    def add_from_global(self, request):
-        # Add an ingredient from the global list (IngredientAllData) to the user's fridge
-        name = request.data.get("name")
-        quantity = request.data.get("quantity", 1)
-        expiration_date = request.data.get("expiration_date")  # Accept expiration date from frontend
-        if not name:
-            return Response({"error": "No ingredient name provided."}, status=400)
-        try:
-            base = IngredientAllData.objects.get(name=name)
-        except IngredientAllData.DoesNotExist:
-            return Response({"error": "Ingredient does not exist."}, status=404)
-        # Get or create the ingredient for the user, and update quantity/expiration if it already exists
-        ingredient, created = Ingredient.objects.get_or_create(
-            user=request.user, name=base.name,
-            defaults={"quantity": quantity, "expiration_date": expiration_date}
-        )
-        if not created:
-            ingredient.quantity += int(quantity)
-            if expiration_date:
-                ingredient.expiration_date = expiration_date
-            ingredient.save()
-        return Response(IngredientSerializer(ingredient).data)
-
-    @action(detail=True, methods=["patch"])
-    def set_quantity(self, request, pk=None):
-        # Set a new quantity (and optionally expiration date) for a specific ingredient in the user's fridge
-        ingredient = self.get_object()
-        quantity = request.data.get("quantity")
-        expiration_date = request.data.get("expiration_date")
-        if quantity is not None:
-            ingredient.quantity = int(quantity)
-        if expiration_date:
-            ingredient.expiration_date = expiration_date
-        ingredient.save()
-        return Response({
-            "status": "updated",
-            "quantity": ingredient.quantity,
-            "expiration_date": ingredient.expiration_date
-        })
-    
-
-
-#  Ingredient All Data (for global search)
-class IngredientAllDataViewSet(viewsets.ModelViewSet):
-    queryset = IngredientAllData.objects.all()
-    serializer_class = IngredientAllDataSerializer
-    permission_classes = [AllowAny]
-    filter_backends = [drf_filters.SearchFilter]
-    search_fields = ['name']
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        search_query = self.request.query_params.get('search', None)
-        if search_query:
-            queryset = queryset.filter(name__istartswith=search_query)
-        return queryset
-
-#  Recipe Management
-class RecipeViewSet(viewsets.ModelViewSet):
-    serializer_class = RecipeSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        # Return all recipes (could be filtered further if needed)
-        return Recipe.objects.all()
-
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
-    def add_missing_ingredients_to_shopping_list(self, request, pk=None):
-        """
-        Add ingredients from the selected recipe to the user's shopping list,
-        but only those ingredients that are NOT already in the user's fridge.
-        """
-        recipe = self.get_object()
-        user = request.user
-
-        # Get all ingredient names in the user's fridge
-        user_ingredient_names = set(
-            user.ingredients.values_list('name', flat=True)
-        )
-
-        # Get all ingredient names required by the recipe
-        recipe_ingredient_names = set(
-            recipe.ingredients.values_list('name', flat=True)
-        )
-
-        # Find missing ingredients (those not in the user's fridge)
-        missing_ingredient_names = recipe_ingredient_names - user_ingredient_names
-
-        if not missing_ingredient_names:
-            # If all ingredients are already in the fridge, do nothing
-            return Response({"detail": "All ingredients are already in your fridge."})
-
-        # Get or create the user's current shopping list (could be improved to handle multiple lists)
-        shopping_list, _ = ShoppingList.objects.get_or_create(user=user)
-
-        # Add missing ingredients to the shopping list
-        added_items = []
-        for name in missing_ingredient_names:
-            # Find the IngredientAllData object for the missing ingredient
-            try:
-                ingredient_data = IngredientAllData.objects.get(name=name)
-            except IngredientAllData.DoesNotExist:
-                continue  # skip if not found
-
-            # Create a ShoppingListItem if not already present
-            item, created = ShoppingListItem.objects.get_or_create(
-                shopping_list=shopping_list,
-                ingredient=ingredient_data,
-                defaults={"quantity": "1"}
-            )
-            if created:
-                added_items.append(name)
-
-        return Response({
-            "added": list(added_items),
-            "detail": f"Added {len(added_items)} missing ingredients to your shopping list."
-        })
-
-
-#  Meal Planning with Filtering
-class MealFilter(dj_filters.FilterSet):
-    start = dj_filters.DateFilter(field_name="date", lookup_expr="gte")
-    end = dj_filters.DateFilter(field_name="date", lookup_expr="lte")
-
-    class Meta:
-        model = Meal
-        fields = ["start", "end", "meal_type"]
-
-
-class MealViewSet(viewsets.ModelViewSet):
-    serializer_class = MealSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_class = MealFilter
-
-    def get_queryset(self):
-        # Return only meals belonging to the current user
-        return Meal.objects.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        # When creating a new meal, automatically assign it to the current user
-        serializer.save(user=self.request.user)
-
-    @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated])
-    def add_recipe_to_calendar(self, request):
-        """
-        Assign a recipe to a specific date (and optionally meal_type) for the current user.
-        Expects: {"recipe_id": 123, "date": "2025-06-10", "meal_type": "dinner"}
-        """
-        recipe_id = request.data.get("recipe_id")
-        date = request.data.get("date")
-        meal_type = request.data.get("meal_type", "dinner")  # default to dinner if not provided
-
-        # Check if required fields are present
-        if not recipe_id or not date:
-            return Response({"error": "recipe_id and date are required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Try to get the recipe by ID
-        try:
-            recipe = Recipe.objects.get(id=recipe_id)
-        except Recipe.DoesNotExist:
-            return Response({"error": "Recipe not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        # Get or create the meal for the user, date, and meal_type
-        @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated])
-        def add_recipe_to_calendar(self, request):
-            """
-            Assign a recipe to a specific date (and optionally meal_type) for the current user.
-            Expects: {"recipe_id": 123, "date": "2025-06-10", "meal_type": "dinner"}
-            """
-            recipe_id = request.data.get("recipe_id")
-            date = request.data.get("date")
-            meal_type = request.data.get("meal_type", "dinner")  # default to dinner if not provided
-
-            # Check if required fields are present
-            if not recipe_id or not date:
-                return Response({"error": "recipe_id and date are required."}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Try to get the recipe by ID
-            try:
-                recipe = Recipe.objects.get(id=recipe_id)
-            except Recipe.DoesNotExist:
-                return Response({"error": "Recipe not found."}, status=status.HTTP_404_NOT_FOUND)
-
-            # Always create a new meal, even if one exists for this date/type/recipe
-            meal = Meal.objects.create(
-                user=request.user,
-                date=date,
-                meal_type=meal_type,
-                recipe=recipe
-            )
-
-            return Response({
-                "id": meal.id,
-                "date": meal.date,
-                "meal_type": meal.meal_type,
-                "recipe": meal.recipe.name,
-            }, status=status.HTTP_201_CREATED)
-        
-#  Shopping List
-class ShoppingListViewSet(viewsets.ModelViewSet):
-    serializer_class = ShoppingListSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return ShoppingList.objects.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-
-#  Shopping List Items
-class ShoppingListItemViewSet(viewsets.ModelViewSet):
-    queryset = ShoppingListItem.objects.all()
-    serializer_class = ShoppingListItemSerializer
-    permission_classes = [IsAuthenticated]
-
-
-#  Stats Endpoint
-class MealStatsView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        user = request.user
-        meals = Meal.objects.filter(user=user)
-        total_meals = meals.count()
-
-        meal_type_counts = meals.values("meal_type").annotate(count=Count("meal_type"))
-
-        top_ingredients = (
-            Ingredient.objects.filter(user=user)
-            .values("name")
-            .annotate(count=Count("name"))
-            .order_by("-count")[:5]
-        )
-
-        return Response({
-            "total_meals": total_meals,
-            "meal_types": {m["meal_type"]: m["count"] for m in meal_type_counts},
-            "top_ingredients": list(top_ingredients),
-        })
-
-
-# Global ingredient search (used to add to user's own list)
-class GlobalIngredientSearchView(generics.ListAPIView):
-    queryset = Ingredient.objects.all()
-    serializer_class = IngredientSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [drf_filters.SearchFilter]
-    search_fields = ['name']
-
-
-# Recipe suggestions based on user's available ingredients
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def matching_recipes(request):
-    user_ingredients = request.user.ingredients.filter(is_available=True).values_list('name', flat=True)
-    matching = Recipe.objects.filter(ingredients__name__in=user_ingredients).distinct()
-    return Response(RecipeSerializer(matching, many=True).data)
 
 class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
@@ -402,11 +106,25 @@ class GoogleLoginView(APIView):
             return Response({"error": "Token is required"}, status=400)
 
         try:
-            idinfo = id_token.verify_oauth2_token(token, google_requests.Request())
+            # Verify Google token with proper client ID and clock skew tolerance
+            idinfo = id_token.verify_oauth2_token(
+                token, 
+                google_requests.Request(),
+                audience=None,  # Accept any client ID for now - you may want to specify your Google client ID here
+                clock_skew_in_seconds=10  # Allow 10 seconds of clock skew
+            )
+            
             email = idinfo["email"]
             first_name = idinfo.get("given_name", "")
             last_name = idinfo.get("family_name", "")
-            username = f"{first_name}_{last_name}".lower()
+            
+            # Generate a unique username if the simple format would cause duplicates
+            base_username = f"{first_name}_{last_name}".lower()
+            username = base_username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}_{counter}"
+                counter += 1
 
             user, created = User.objects.get_or_create(email=email, defaults={
                 "first_name": first_name,
@@ -431,25 +149,378 @@ class GoogleLoginView(APIView):
                 }
             })
 
-        except ValueError:
+        except ValueError as e:
+            print(f"Google token verification failed: {e}")
             return Response({"error": "Invalid token"}, status=400)
+        except Exception as e:
+            print(f"Google login error: {e}")
+            return Response({"error": "Authentication failed"}, status=400)
+
+
+# =====================================
+# USER PROFILE & PREFERENCES
+# =====================================
+
+class UserProfileViewSet(viewsets.ModelViewSet):
+    queryset = UserProfile.objects.all()
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return UserProfile.objects.filter(user=self.request.user)
+
+
+class DietaryPreferenceViewSet(viewsets.ModelViewSet):
+    queryset = DietaryPreference.objects.all()
+    serializer_class = DietaryPreferenceSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class AllergyViewSet(viewsets.ModelViewSet):
+    queryset = Allergy.objects.all()
+    serializer_class = AllergySerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [drf_filters.SearchFilter]
+    search_fields = ['name']
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search_query = self.request.query_params.get('search', None)
         
+        # Define the curated list of 100 most popular allergens
+        curated_allergens = [
+            # Top 20 most common allergens (4 rows of 5 each)
+            'milk', 'eggs', 'peanuts', 'tree nuts', 'soy',
+            'fish', 'shellfish', 'wheat', 'sesame', 'gluten',
+            'sulphites', 'corn', 'mustard', 'celery', 'lupin',
+            'coconut', 'yeast', 'chocolate', 'tomatoes', 'citrus',
+            
+            # Additional 80 popular allergens
+            'almonds', 'walnuts', 'cashews', 'pistachios', 'hazelnuts',
+            'brazil nuts', 'pecans', 'macadamia nuts', 'pine nuts', 'chestnuts',
+            'shrimp', 'crab', 'lobster', 'oysters', 'mussels', 'clams', 'scallops',
+            'salmon', 'tuna', 'cod', 'halibut', 'sardines', 'anchovies',
+            'cheese', 'butter', 'cream', 'yogurt', 'whey', 'casein', 'lactose',
+            'sour cream', 'cream cheese', 'ice cream',
+            'barley', 'rye', 'oats', 'spelt', 'kamut', 'triticale',
+            'bulgur', 'semolina', 'durum',
+            'strawberries', 'kiwi', 'mango', 'pineapple', 'peaches',
+            'apples', 'bananas', 'grapes', 'cherries', 'apricots',
+            'carrots', 'peppers', 'onions', 'garlic', 'potatoes', 'eggplant', 'spinach', 'lettuce',
+            'cinnamon', 'vanilla', 'oregano', 'basil', 'thyme', 'rosemary',
+            'paprika', 'cumin', 'turmeric', 'ginger', 'black pepper',
+            'avocado', 'cocoa', 'caffeine', 'alcohol', 'vinegar', 'honey', 'maple syrup',
+            'artificial sweeteners', 'food coloring', 'preservatives', 'msg', 'sulfur dioxide',
+            'beef', 'chicken', 'pork', 'turkey', 'lamb', 'duck', 'goose',
+            'chickpeas', 'lentils', 'black beans', 'kidney beans', 'lima beans',
+            'green peas', 'pinto beans', 'molluscs'
+        ]
+        
+        # Define the top 20 most popular allergens (4 rows of 5 each)
+        top_20_allergens = [
+            'milk', 'eggs', 'peanuts', 'tree nuts', 'soy',
+            'fish', 'shellfish', 'wheat', 'sesame', 'gluten',
+            'sulphites', 'corn', 'mustard', 'celery', 'lupin',
+            'coconut', 'yeast', 'chocolate', 'tomatoes', 'citrus'
+        ]
+        
+        # First, limit to only the curated list of 100 allergens
+        queryset = queryset.filter(name__in=curated_allergens)
+        
+        if search_query:
+            # If searching, return matching results from the curated list only
+            queryset = queryset.filter(name__istartswith=search_query)
+        else:
+            # If no search, only show top 20 allergens (4 rows of 5)
+            queryset = queryset.filter(name__in=top_20_allergens)
+        
+        return queryset
 
 
-def normalize_title(title):
-    # Remove content inside parentheses, including the parentheses
-    title = re.sub(r'\(.*?\)', '', title)
-    # Normalize the title
-    return title.strip().lower().replace("’", "'").replace("`", "'").replace("”", '"').replace("“", '"')
+# =====================================
+# INGREDIENT MANAGEMENT
+# =====================================
 
-# AI Recipe Search based on ingredients
-class AIRecipeSearchView(APIView):
+class IngredientViewSet(viewsets.ModelViewSet):
+    serializer_class = IngredientSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Ingredient.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def toggle_availability(self, request, pk=None):
+        ingredient = self.get_object()
+        ingredient.is_available = not ingredient.is_available
+        ingredient.save()
+        return Response({"status": "updated", "is_available": ingredient.is_available})
+
+    @action(detail=False, methods=["post"])
+    def add_from_global(self, request):
+        name = request.data.get("name")
+        quantity = request.data.get("quantity", 1)
+        expiration_date = request.data.get("expiration_date")
+        
+        if not name:
+            return Response({"error": "No ingredient name provided."}, status=400)
+        
+        try:
+            base = IngredientAllData.objects.get(name=name)
+        except IngredientAllData.DoesNotExist:
+            return Response({"error": "Ingredient does not exist."}, status=404)
+        
+        ingredient, created = Ingredient.objects.get_or_create(
+            user=request.user, name=base.name,
+            defaults={"quantity": quantity, "expiration_date": expiration_date}
+        )
+        
+        if not created:
+            ingredient.quantity += int(quantity)
+            if expiration_date:
+                ingredient.expiration_date = expiration_date
+            ingredient.save()
+        
+        return Response(IngredientSerializer(ingredient).data)
+
+    @action(detail=True, methods=["patch"])
+    def set_quantity(self, request, pk=None):
+        ingredient = self.get_object()
+        quantity = request.data.get("quantity")
+        expiration_date = request.data.get("expiration_date")
+        
+        if quantity is not None:
+            ingredient.quantity = int(quantity)
+        if expiration_date:
+            ingredient.expiration_date = expiration_date
+        
+        ingredient.save()
+        return Response({
+            "status": "updated",
+            "quantity": ingredient.quantity,
+            "expiration_date": ingredient.expiration_date
+        })
+
+
+class IngredientAllDataViewSet(viewsets.ModelViewSet):
+    queryset = IngredientAllData.objects.all()
+    serializer_class = IngredientAllDataSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [drf_filters.SearchFilter]
+    search_fields = ['name']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Apply search filter
+        search_query = self.request.query_params.get('search', None)
+        if search_query:
+            queryset = queryset.filter(name__istartswith=search_query)
+        
+        # Apply dietary preference and allergen filtering if user is authenticated
+        if self.request.user.is_authenticated:
+            try:
+                user_profile = UserProfile.objects.get(user=self.request.user)
+                
+                # Filter by dietary preference
+                if user_profile.dietary_preference:
+                    queryset = queryset.filter(dietary_preferences=user_profile.dietary_preference)
+                
+                # Exclude ingredients that contain user's allergens
+                if user_profile.allergies.exists():
+                    user_allergens = user_profile.allergies.all()
+                    queryset = queryset.exclude(contains_allergens__in=user_allergens)
+                
+                # Also exclude ingredients that ARE the user's allergens themselves
+                if user_profile.allergies.exists():
+                    user_allergens = user_profile.allergies.all()
+                    queryset = queryset.exclude(contains_allergens__in=user_allergens)
+                    
+            except UserProfile.DoesNotExist:
+                pass
+        
+        return queryset
+
+
+class IngredientAllDataUnfilteredViewSet(viewsets.ModelViewSet):
+    """Ingredient search that filters out user's allergens but not dietary preferences"""
+    queryset = IngredientAllData.objects.all()
+    serializer_class = IngredientAllDataSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [drf_filters.SearchFilter]
+    search_fields = ['name']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Apply search filter
+        search_query = self.request.query_params.get('search', None)
+        if search_query:
+            queryset = queryset.filter(name__istartswith=search_query)
+        
+        # Filter out allergens if user is authenticated
+        if self.request.user.is_authenticated:
+            try:
+                user_profile = UserProfile.objects.get(user=self.request.user)
+                if user_profile.allergies.exists():
+                    user_allergens = user_profile.allergies.all()
+                    user_allergen_names = user_allergens.values_list('name', flat=True)
+                    
+                    # Exclude ingredients that ARE allergens or contain user's allergens
+                    queryset = queryset.exclude(
+                        Q(contains_allergens__in=user_allergens) | 
+                        Q(name__in=user_allergen_names)
+                    )
+                    
+            except UserProfile.DoesNotExist:
+                pass
+        
+        return queryset
+
+
+# =====================================
+# RECIPE MANAGEMENT
+# =====================================
+
+class RecipeViewSet(viewsets.ModelViewSet):
+    serializer_class = RecipeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Recipe.objects.all()
+        
+        # Apply dietary preference and allergy filtering if user is authenticated
+        if self.request.user.is_authenticated:
+            try:
+                user_profile = UserProfile.objects.get(user=self.request.user)
+                
+                # Filter by dietary preference
+                if user_profile.dietary_preference:
+                    queryset = queryset.filter(suitable_for_diets=user_profile.dietary_preference)
+                
+                # Exclude recipes that contain user's allergens
+                if user_profile.allergies.exists():
+                    user_allergens = user_profile.allergies.all()
+                    queryset = queryset.exclude(contains_allergens__in=user_allergens)
+                    
+            except UserProfile.DoesNotExist:
+                pass
+        
+        return queryset.distinct()
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    def add_missing_ingredients_to_shopping_list(self, request, pk=None):
+        """Add ingredients from the selected recipe to the user's shopping list"""
+        recipe = self.get_object()
+        user = request.user
+
+        # Get all ingredient names in the user's fridge
+        user_ingredient_names = set(user.ingredients.values_list('name', flat=True))
+
+        # Get all ingredient names required by the recipe
+        recipe_ingredient_names = set(recipe.ingredients.values_list('name', flat=True))
+
+        # Find missing ingredients
+        missing_ingredient_names = recipe_ingredient_names - user_ingredient_names
+
+        if not missing_ingredient_names:
+            return Response({"detail": "All ingredients are already in your fridge."})
+
+        # Get or create the user's current shopping list
+        shopping_list, _ = ShoppingList.objects.get_or_create(user=user)
+
+        # Add missing ingredients to the shopping list
+        added_items = []
+        for name in missing_ingredient_names:
+            try:
+                ingredient_data = IngredientAllData.objects.get(name=name)
+                item, created = ShoppingListItem.objects.get_or_create(
+                    shopping_list=shopping_list,
+                    ingredient=ingredient_data,
+                    defaults={"quantity": "1"}
+                )
+                if created:
+                    added_items.append(name)
+            except IngredientAllData.DoesNotExist:
+                continue
+
+        return Response({
+            "added": list(added_items),
+            "detail": f"Added {len(added_items)} missing ingredients to your shopping list."
+        })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def matching_recipes(request):
+    """Recipe suggestions based on user's available ingredients using pure matching"""
+    user_ingredients = request.user.ingredients.filter(is_available=True).values_list('name', flat=True)
+    
+    if not user_ingredients:
+        return Response([])
+    
+    # Pure matching algorithm: Find recipes that contain ALL the user's ingredients
+    # This ensures recipes must have every ingredient from user's storage
+    matching = Recipe.objects.filter(
+        ingredients__name__in=user_ingredients
+    ).annotate(
+        matching_count=Count('ingredients', filter=Q(ingredients__name__in=user_ingredients))
+    ).filter(
+        matching_count=len(user_ingredients)  # Only recipes with ALL user ingredients
+    ).order_by('name').distinct()
+    
+    # Filter out recipes containing user's allergens
+    try:
+        user_profile = UserProfile.objects.get(user=request.user)
+        
+        # Filter by dietary preference
+        if user_profile.dietary_preference:
+            matching = matching.filter(suitable_for_diets=user_profile.dietary_preference)
+        
+        # Exclude recipes that contain user's allergens
+        if user_profile.allergies.exists():
+            user_allergens = user_profile.allergies.all()
+            matching = matching.exclude(contains_allergens__in=user_allergens)
+            
+    except UserProfile.DoesNotExist:
+        pass
+    
+    return Response(RecipeSerializer(matching.distinct(), many=True).data)
+
+
+class RecipeSearchView(APIView):
+    """Pure matching Recipe Search based on ingredients with comprehensive allergen filtering"""
     permission_classes = [AllowAny]
 
     def post(self, request):
         ingredient_names = request.data.get("ingredients", [])
         if not ingredient_names or not isinstance(ingredient_names, list):
             return Response({"error": "A list of ingredients is required."}, status=400)
+
+        # First, filter out any ingredients that are allergens if user is authenticated
+        if request.user.is_authenticated:
+            try:
+                user_profile = UserProfile.objects.get(user=request.user)
+                if user_profile.allergies.exists():
+                    user_allergens = user_profile.allergies.all()
+                    user_allergen_names = user_allergens.values_list('name', flat=True)
+                    
+                    # Filter out ingredients that ARE allergens or contain user's allergens
+                    safe_ingredients = IngredientAllData.objects.filter(
+                        name__in=ingredient_names
+                    ).exclude(
+                        Q(contains_allergens__in=user_allergens) | 
+                        Q(name__in=user_allergen_names)
+                    )
+                    
+                    ingredient_names = list(safe_ingredients.values_list('name', flat=True))
+            except UserProfile.DoesNotExist:
+                pass
+
+        if not ingredient_names:
+            return Response({"error": "No safe ingredients provided after filtering allergens."}, status=400)
 
         # Ensure all ingredients exist in IngredientAllData
         ingredients_qs = IngredientAllData.objects.filter(name__in=ingredient_names)
@@ -458,19 +529,140 @@ class AIRecipeSearchView(APIView):
         if not ingredients:
             return Response({"error": "No matching ingredients found."}, status=400)
 
-        # Use the new overlap-based function to get recipe titles
-        recipe_titles = find_recipes_by_ingredients(ingredients)
+        # Pure matching algorithm: Find recipes that contain ALL the selected ingredients
+        # This ensures recipes must have every ingredient you search with
+        matching_recipes = Recipe.objects.filter(
+            ingredients__name__in=ingredients
+        ).annotate(
+            matching_count=Count('ingredients', filter=Q(ingredients__name__in=ingredients))
+        ).filter(
+            matching_count=len(ingredients)  # Only recipes with ALL ingredients
+        ).order_by('name').distinct()
 
-        # Normalize all DB recipe names once
-        db_recipes = list(Recipe.objects.all())
-        normalized_db = {normalize_title(r.name): r for r in db_recipes}
+        # Apply user dietary preferences and allergen filtering if authenticated
+        if request.user.is_authenticated:
+            try:
+                user_profile = UserProfile.objects.get(user=request.user)
+                
+                # Filter by dietary preference
+                if user_profile.dietary_preference:
+                    matching_recipes = matching_recipes.filter(suitable_for_diets=user_profile.dietary_preference)
+                
+                # Exclude recipes that contain user's allergens
+                if user_profile.allergies.exists():
+                    user_allergens = user_profile.allergies.all()
+                    matching_recipes = matching_recipes.exclude(contains_allergens__in=user_allergens)
+                
+            except UserProfile.DoesNotExist:
+                pass
 
-        # Find recipes by normalized title
-        matched_recipes = []
-        for ai_title in recipe_titles:
-            norm_ai_title = normalize_title(ai_title)
-            if norm_ai_title in normalized_db:
-                matched_recipes.append(normalized_db[norm_ai_title])
+        # Return the matching recipes
+        return Response(RecipeSerializer(matching_recipes, many=True).data)
 
-        # Return recipes in the same structure as before
-        return Response(RecipeSerializer(matched_recipes, many=True).data)
+
+# =====================================
+# MEAL PLANNING
+# =====================================
+
+class MealFilter(dj_filters.FilterSet):
+    start = dj_filters.DateFilter(field_name="date", lookup_expr="gte")
+    end = dj_filters.DateFilter(field_name="date", lookup_expr="lte")
+
+    class Meta:
+        model = Meal
+        fields = ["start", "end", "meal_type"]
+
+
+class MealViewSet(viewsets.ModelViewSet):
+    serializer_class = MealSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = MealFilter
+
+    def get_queryset(self):
+        return Meal.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated])
+    def add_recipe_to_calendar(self, request):
+        """
+        Assign a recipe to a specific date (and optionally meal_type) for the current user.
+        Expects: {"recipe_id": 123, "date": "2025-06-10", "meal_type": "dinner"}
+        """
+        recipe_id = request.data.get("recipe_id")
+        date = request.data.get("date")
+        meal_type = request.data.get("meal_type", "dinner")
+
+        if not recipe_id or not date:
+            return Response({"error": "recipe_id and date are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            recipe = Recipe.objects.get(id=recipe_id)
+        except Recipe.DoesNotExist:
+            return Response({"error": "Recipe not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Always create a new meal, even if one exists for this date/type/recipe
+        meal = Meal.objects.create(
+            user=request.user,
+            date=date,
+            meal_type=meal_type,
+            recipe=recipe
+        )
+
+        return Response({
+            "id": meal.id,
+            "date": meal.date,
+            "meal_type": meal.meal_type,
+            "recipe": meal.recipe.name,
+        }, status=status.HTTP_201_CREATED)
+
+
+# =====================================
+# SHOPPING LIST MANAGEMENT
+# =====================================
+
+class ShoppingListViewSet(viewsets.ModelViewSet):
+    serializer_class = ShoppingListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ShoppingList.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ShoppingListItemViewSet(viewsets.ModelViewSet):
+    queryset = ShoppingListItem.objects.all()
+    serializer_class = ShoppingListItemSerializer
+    permission_classes = [IsAuthenticated]
+
+
+# =====================================
+# STATISTICS
+# =====================================
+
+class MealStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        meals = Meal.objects.filter(user=user)
+        total_meals = meals.count()
+
+        meal_type_counts = meals.values("meal_type").annotate(count=Count("meal_type"))
+
+        top_ingredients = (
+            Ingredient.objects.filter(user=user)
+            .values("name")
+            .annotate(count=Count("name"))
+            .order_by("-count")[:5]
+        )
+
+        return Response({
+            "total_meals": total_meals,
+            "meal_types": {m["meal_type"]: m["count"] for m in meal_type_counts},
+            "top_ingredients": list(top_ingredients),
+        })

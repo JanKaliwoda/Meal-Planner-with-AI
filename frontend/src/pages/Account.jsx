@@ -15,8 +15,10 @@ function Account() {
   // Dietary preferences and allergies state
   const [availableDietaryPreferences, setAvailableDietaryPreferences] = useState([])
   const [availableAllergies, setAvailableAllergies] = useState([])
-  const [selectedDietaryPreferences, setSelectedDietaryPreferences] = useState([])
+  const [selectedDietaryPreference, setSelectedDietaryPreference] = useState(null)
   const [selectedAllergies, setSelectedAllergies] = useState([])
+  const [allergySearchTerm, setAllergySearchTerm] = useState("")
+  const [filteredAllergies, setFilteredAllergies] = useState([])
 
   const navigate = useNavigate()
 
@@ -37,11 +39,14 @@ function Account() {
 
     // Fetch dietary preferences and allergies
     api.get("/api/dietary-preferences/").then(res => setAvailableDietaryPreferences(res.data))
-    api.get("/api/allergies/").then(res => setAvailableAllergies(res.data))
+    api.get("/api/allergies/").then(res => {
+      setAvailableAllergies(res.data)
+      setFilteredAllergies(res.data)
+    })
     // Fetch user profile for preferences/allergies
     api.get("/api/user-profiles/").then(res => {
       if (res.data.length > 0) {
-        setSelectedDietaryPreferences(res.data[0].dietary_preferences || [])
+        setSelectedDietaryPreference(res.data[0].dietary_preference)
         setSelectedAllergies(res.data[0].allergies || [])
       }
     })
@@ -95,6 +100,38 @@ function Account() {
     }
   }
 
+  // Filter allergies based on search term - search from API
+  useEffect(() => {
+    const searchAllergies = async () => {
+      if (allergySearchTerm.trim() === "") {
+        // Show default top 20 allergens when no search
+        try {
+          const response = await api.get("/api/allergies/")
+          setFilteredAllergies(response.data)
+        } catch (error) {
+          console.error("Error loading default allergies:", error)
+          setFilteredAllergies(availableAllergies)
+        }
+      } else {
+        try {
+          // Search within the curated list of 100 allergens
+          const response = await api.get(`/api/allergies/?search=${allergySearchTerm}`)
+          setFilteredAllergies(response.data)
+        } catch (error) {
+          console.error("Error searching allergies:", error)
+          // Fallback to local allergy search
+          const filtered = availableAllergies.filter(allergy =>
+            allergy.name.toLowerCase().startsWith(allergySearchTerm.toLowerCase())
+          )
+          setFilteredAllergies(filtered)
+        }
+      }
+    }
+
+    const timeoutId = setTimeout(searchAllergies, 300)
+    return () => clearTimeout(timeoutId)
+  }, [allergySearchTerm, availableAllergies])
+
   const handlePreferencesSave = async (e) => {
     e.preventDefault()
     try {
@@ -102,7 +139,7 @@ function Account() {
       const userProfiles = await api.get("/api/user-profiles/")
       if (userProfiles.data.length > 0) {
         await api.patch(`/api/user-profiles/${userProfiles.data[0].id}/`, {
-          dietary_preferences: selectedDietaryPreferences,
+          dietary_preference: selectedDietaryPreference,
           allergies: selectedAllergies,
         })
         alert("Preferences and allergies updated!")
@@ -113,20 +150,17 @@ function Account() {
     }
   }
 
-  const toggleDietaryPreference = (prefId) => {
-    setSelectedDietaryPreferences(prev => 
-      prev.includes(prefId) 
-        ? prev.filter(id => id !== prefId)
-        : [...prev, prefId]
+  const toggleAllergy = (allergyItem) => {
+    // Regular allergy toggle - no need to create from ingredient anymore
+    setSelectedAllergies(prev => 
+      prev.includes(allergyItem.id) 
+        ? prev.filter(id => id !== allergyItem.id)
+        : [...prev, allergyItem.id]
     )
   }
 
-  const toggleAllergy = (allergyId) => {
-    setSelectedAllergies(prev => 
-      prev.includes(allergyId) 
-        ? prev.filter(id => id !== allergyId)
-        : [...prev, allergyId]
-    )
+  const selectDietaryPreference = (prefId) => {
+    setSelectedDietaryPreference(prev => prev === prefId ? null : prefId)
   }
 
   if (loading) return <div>Loading...</div>
@@ -289,15 +323,15 @@ function Account() {
                   <h3 className="text-base font-semibold text-spring-green-400 mb-2 flex items-center">
                     Dietary Preferences
                   </h3>
-                  <p className="text-gray-300 text-sm mb-3">Click to select your dietary preferences (multiple selections allowed)</p>
+                  <p className="text-gray-300 text-sm mb-3">Choose one dietary preference to get personalized meal recommendations (optional)</p>
                   <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
                     {availableDietaryPreferences.map(pref => {
-                      const isSelected = selectedDietaryPreferences.includes(pref.id)
+                      const isSelected = selectedDietaryPreference === pref.id
                       return (
                         <button
                           key={pref.id}
                           type="button"
-                          onClick={() => toggleDietaryPreference(pref.id)}
+                          onClick={() => selectDietaryPreference(pref.id)}
                           className={`
                             px-3 py-2 rounded-md border transition-all duration-200 text-sm font-medium
                             ${isSelected 
@@ -314,14 +348,12 @@ function Account() {
                       )
                     })}
                   </div>
-                  {selectedDietaryPreferences.length > 0 && (
+                  {selectedDietaryPreference && (
                     <div className="mt-2 p-1.5 bg-emerald-500/10 rounded border border-emerald-500/30">
                       <p className="text-emerald-400 text-xs">
                         <span className="font-semibold">Selected:</span> {
                           availableDietaryPreferences
-                            .filter(pref => selectedDietaryPreferences.includes(pref.id))
-                            .map(pref => pref.name)
-                            .join(', ')
+                            .find(pref => pref.id === selectedDietaryPreference)?.name
                         }
                       </p>
                     </div>
@@ -334,14 +366,26 @@ function Account() {
                     Allergies & Intolerances
                   </h3>
                   <p className="text-gray-300 text-sm mb-3">Select all allergies and intolerances you have (multiple selections allowed)</p>
-                  <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
-                    {availableAllergies.map(allergy => {
+                  
+                  {/* Allergy Search */}
+                  <div className="mb-4">
+                    <input
+                      type="text"
+                      value={allergySearchTerm}
+                      onChange={(e) => setAllergySearchTerm(e.target.value)}
+                      placeholder="Search for allergic products..."
+                      className="w-full px-4 py-2 bg-gunmetal-400 border border-office-green-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+                    {filteredAllergies.map(allergy => {
                       const isSelected = selectedAllergies.includes(allergy.id)
                       return (
                         <button
                           key={allergy.id}
                           type="button"
-                          onClick={() => toggleAllergy(allergy.id)}
+                          onClick={() => toggleAllergy(allergy)}
                           className={`
                             px-3 py-2 rounded-md border transition-all duration-200 text-sm font-medium
                             ${isSelected 
@@ -351,13 +395,19 @@ function Account() {
                           `}
                         >
                           <div className="flex items-center justify-center">
-                            {isSelected && <span className="mr-1"></span>}
+                            {isSelected && <span className="mr-1">✗</span>}
                             {allergy.name}
                           </div>
                         </button>
                       )
                     })}
                   </div>
+                  
+                  {filteredAllergies.length === 0 && allergySearchTerm.trim() && (
+                    <div className="text-center py-4 text-gray-400">
+                      No allergic products found matching "{allergySearchTerm}"
+                    </div>
+                  )}
                   {selectedAllergies.length > 0 && (
                     <div className="mt-2 p-1.5 bg-red-500/10 rounded border border-red-500/30">
                       <p className="text-red-400 text-xs">

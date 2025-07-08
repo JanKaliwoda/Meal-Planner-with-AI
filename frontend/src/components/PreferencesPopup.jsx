@@ -4,10 +4,12 @@ import api from "../api"
 function PreferencesPopup({ isOpen, onClose, onComplete }) {
   const [availableDietaryPreferences, setAvailableDietaryPreferences] = useState([])
   const [availableAllergies, setAvailableAllergies] = useState([])
-  const [selectedDietaryPreferences, setSelectedDietaryPreferences] = useState([])
+  const [selectedDietaryPreference, setSelectedDietaryPreference] = useState(null)
   const [selectedAllergies, setSelectedAllergies] = useState([])
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState(1) // 1: preferences, 2: allergies
+  const [allergySearchTerm, setAllergySearchTerm] = useState("")
+  const [filteredAllergies, setFilteredAllergies] = useState([])
 
   useEffect(() => {
     if (isOpen) {
@@ -18,25 +20,55 @@ function PreferencesPopup({ isOpen, onClose, onComplete }) {
       ]).then(([prefsRes, allergiesRes]) => {
         setAvailableDietaryPreferences(prefsRes.data)
         setAvailableAllergies(allergiesRes.data)
+        setFilteredAllergies(allergiesRes.data)
       }).catch(err => {
         console.error("Failed to load preferences/allergies", err)
       })
     }
   }, [isOpen])
 
-  const toggleDietaryPreference = (prefId) => {
-    setSelectedDietaryPreferences(prev => 
-      prev.includes(prefId) 
-        ? prev.filter(id => id !== prefId)
-        : [...prev, prefId]
-    )
+  // Filter allergies based on search term - search from API
+  useEffect(() => {
+    const searchAllergies = async () => {
+      if (allergySearchTerm.trim() === "") {
+        // Show default top 20 allergens when no search
+        try {
+          const response = await api.get("/api/allergies/")
+          setFilteredAllergies(response.data)
+        } catch (error) {
+          console.error("Error loading default allergies:", error)
+          setFilteredAllergies(availableAllergies)
+        }
+      } else {
+        try {
+          // Search within the curated list of 100 allergens
+          const response = await api.get(`/api/allergies/?search=${allergySearchTerm}`)
+          setFilteredAllergies(response.data)
+        } catch (error) {
+          console.error("Error searching allergies:", error)
+          // Fallback to local allergy search
+          const filtered = availableAllergies.filter(allergy =>
+            allergy.name.toLowerCase().startsWith(allergySearchTerm.toLowerCase())
+          )
+          setFilteredAllergies(filtered)
+        }
+      }
+    }
+
+    const timeoutId = setTimeout(searchAllergies, 300)
+    return () => clearTimeout(timeoutId)
+  }, [allergySearchTerm, availableAllergies])
+
+  const selectDietaryPreference = (prefId) => {
+    setSelectedDietaryPreference(prev => prev === prefId ? null : prefId)
   }
 
-  const toggleAllergy = (allergyId) => {
+  const toggleAllergy = (allergyItem) => {
+    // Regular allergy toggle - no need to create from ingredient anymore
     setSelectedAllergies(prev => 
-      prev.includes(allergyId) 
-        ? prev.filter(id => id !== allergyId)
-        : [...prev, allergyId]
+      prev.includes(allergyItem.id) 
+        ? prev.filter(id => id !== allergyItem.id)
+        : [...prev, allergyItem.id]
     )
   }
 
@@ -60,7 +92,7 @@ function PreferencesPopup({ isOpen, onClose, onComplete }) {
         } else {
           // Create a new user profile
           const newProfile = await api.post("/api/user-profiles/", {
-            dietary_preferences: [],
+            dietary_preference: null,
             allergies: []
           })
           userProfileId = newProfile.data.id
@@ -69,7 +101,7 @@ function PreferencesPopup({ isOpen, onClose, onComplete }) {
         console.error("Error with user profile:", error)
         // Try to create a new profile
         const newProfile = await api.post("/api/user-profiles/", {
-          dietary_preferences: [],
+          dietary_preference: null,
           allergies: []
         })
         userProfileId = newProfile.data.id
@@ -77,7 +109,7 @@ function PreferencesPopup({ isOpen, onClose, onComplete }) {
 
       // Update user profile with selected preferences and allergies
       await api.patch(`/api/user-profiles/${userProfileId}/`, {
-        dietary_preferences: selectedDietaryPreferences,
+        dietary_preference: selectedDietaryPreference,
         allergies: selectedAllergies,
       })
 
@@ -130,17 +162,17 @@ function PreferencesPopup({ isOpen, onClose, onComplete }) {
                 Dietary Preferences
               </h3>
               <p className="text-gray-300 text-sm mb-4">
-                Select your dietary preferences to get personalized meal recommendations (optional)
+                Choose one dietary preference to get personalized meal recommendations (optional)
               </p>
               
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
                 {availableDietaryPreferences.map(pref => {
-                  const isSelected = selectedDietaryPreferences.includes(pref.id)
+                  const isSelected = selectedDietaryPreference === pref.id
                   return (
                     <button
                       key={pref.id}
                       type="button"
-                      onClick={() => toggleDietaryPreference(pref.id)}
+                      onClick={() => selectDietaryPreference(pref.id)}
                       className={`
                         px-4 py-3 rounded-lg border transition-all duration-200 text-sm font-medium
                         ${isSelected 
@@ -158,14 +190,12 @@ function PreferencesPopup({ isOpen, onClose, onComplete }) {
                 })}
               </div>
 
-              {selectedDietaryPreferences.length > 0 && (
+              {selectedDietaryPreference && (
                 <div className="mb-4 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
                   <p className="text-emerald-400 text-sm">
                     <span className="font-semibold">Selected:</span> {
                       availableDietaryPreferences
-                        .filter(pref => selectedDietaryPreferences.includes(pref.id))
-                        .map(pref => pref.name)
-                        .join(', ')
+                        .find(pref => pref.id === selectedDietaryPreference)?.name
                     }
                   </p>
                 </div>
@@ -198,14 +228,25 @@ function PreferencesPopup({ isOpen, onClose, onComplete }) {
                 Select your allergies and intolerances to ensure safe meal recommendations
               </p>
               
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
-                {availableAllergies.map(allergy => {
+              {/* Allergy Search */}
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={allergySearchTerm}
+                  onChange={(e) => setAllergySearchTerm(e.target.value)}
+                  placeholder="Search allergies..."
+                  className="w-full px-4 py-2 bg-gunmetal-400 border border-office-green-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-6">
+                {filteredAllergies.map(allergy => {
                   const isSelected = selectedAllergies.includes(allergy.id)
                   return (
                     <button
                       key={allergy.id}
                       type="button"
-                      onClick={() => toggleAllergy(allergy.id)}
+                      onClick={() => toggleAllergy(allergy)}
                       className={`
                         px-4 py-3 rounded-lg border transition-all duration-200 text-sm font-medium
                         ${isSelected 
@@ -215,13 +256,19 @@ function PreferencesPopup({ isOpen, onClose, onComplete }) {
                       `}
                     >
                       <div className="flex items-center justify-center">
-                        {isSelected && <span className="mr-2"></span>}
+                        {isSelected && <span className="mr-2">✗</span>}
                         {allergy.name}
                       </div>
                     </button>
                   )
                 })}
               </div>
+
+              {filteredAllergies.length === 0 && allergySearchTerm.trim() && (
+                <div className="text-center py-4 text-gray-400">
+                  No allergies found matching "{allergySearchTerm}"
+                </div>
+              )}
 
               {selectedAllergies.length > 0 && (
                 <div className="mb-4 p-3 bg-red-500/10 rounded-lg border border-red-500/30">

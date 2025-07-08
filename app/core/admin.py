@@ -13,41 +13,40 @@ class DietaryPreferenceAdmin(admin.ModelAdmin):
 
 @admin.register(models.UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ["user"]
-    filter_horizontal = ["allergies", "dietary_preferences"]
-
-@admin.register(models.Ingredient)
-class IngredientAdmin(admin.ModelAdmin):
-    list_display = ["name", "quantity", "is_available", "user"]
-    list_filter = ["is_available"]
-    search_fields = ["name", "user__username"]
+    list_display = ["user", "dietary_preference"]
+    filter_horizontal = ["allergies"]
+    list_filter = ["dietary_preference"]
 
 @admin.register(models.IngredientAllData)
 class IngredientAllDataAdmin(admin.ModelAdmin):
-    list_display = ["name", "is_verified", "recipe_count", "created_at", "updated_at"]
-    list_filter = ["is_verified", "created_at", "contains_allergens", "dietary_preferences"]
+    list_display = ["name", "get_allergens", "get_dietary_preferences", "recipe_count"]
+    list_filter = ["contains_allergens", "dietary_preferences"]
     search_fields = ["name"]
     ordering = ["name"]
     filter_horizontal = ["contains_allergens", "dietary_preferences"]
-    readonly_fields = ["created_at", "updated_at", "recipe_count"]
-    actions = ["mark_as_verified", "mark_as_unverified", "find_duplicates"]
+    readonly_fields = ["recipe_count"]
+    actions = ["find_duplicates"]
     
     def recipe_count(self, obj):
         """Show how many recipes use this ingredient"""
         return obj.recipes.count()
     recipe_count.short_description = "Used in recipes"
     
-    def mark_as_verified(self, request, queryset):
-        """Mark selected ingredients as verified"""
-        updated = queryset.update(is_verified=True)
-        self.message_user(request, f"{updated} ingredients marked as verified.")
-    mark_as_verified.short_description = "Mark selected ingredients as verified"
+    def get_allergens(self, obj):
+        """Display all allergens for this ingredient"""
+        allergens = obj.contains_allergens.all()
+        if allergens:
+            return ", ".join([allergen.name for allergen in allergens])
+        return "None"
+    get_allergens.short_description = "Allergens"
     
-    def mark_as_unverified(self, request, queryset):
-        """Mark selected ingredients as unverified"""
-        updated = queryset.update(is_verified=False)
-        self.message_user(request, f"{updated} ingredients marked as unverified.")
-    mark_as_unverified.short_description = "Mark selected ingredients as unverified"
+    def get_dietary_preferences(self, obj):
+        """Display all dietary preferences for this ingredient"""
+        preferences = obj.dietary_preferences.all()
+        if preferences:
+            return ", ".join([pref.name for pref in preferences])
+        return "None"
+    get_dietary_preferences.short_description = "Dietary Preferences"
     
     def find_duplicates(self, request, queryset):
         """Find potential duplicates among selected ingredients"""
@@ -74,17 +73,10 @@ class IngredientAllDataAdmin(admin.ModelAdmin):
 
 @admin.register(models.Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    list_display = ["name", "created_by", "created_by_ai"]
+    list_display = ["name", "created_by", "created_by_ai", "get_ingredients"]
+    search_fields = ["name", "description", "steps", "ingredients__name"]
     filter_horizontal = ["ingredients"]
 
-@admin.register(models.Meal)
-class MealAdmin(admin.ModelAdmin):
-    list_display = ["user", "meal_type", "date", "recipe"]
-
-@admin.register(models.ShoppingList)
-class ShoppingListAdmin(admin.ModelAdmin):
-    list_display = ["user", "created_at"]
-
-@admin.register(models.ShoppingListItem)
-class ShoppingListItemAdmin(admin.ModelAdmin):
-    list_display = ["shopping_list", "ingredient", "quantity"]
+    def get_ingredients(self, obj):
+        return ", ".join([ing.name for ing in obj.ingredients.all()])
+    get_ingredients.short_description = "Ingredients"

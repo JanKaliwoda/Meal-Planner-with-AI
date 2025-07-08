@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import api from "../api"
 import SpotlightCard from "../components/SpotlightCard"
 
+
 function Storage() {
   const [myIngredients, setMyIngredients] = useState([])
   const [searchInput, setSearchInput] = useState("")
@@ -9,6 +10,65 @@ function Storage() {
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState(false)
   const [alerts, setAlerts] = useState([])
+  const [userAllergens, setUserAllergens] = useState([])
+  
+  // Helper function to get allergen variants
+  const getAllergenVariants = (allergenName) => {
+    const variants = [allergenName.toLowerCase()]
+    
+    // Handle simple plural forms
+    if (allergenName.toLowerCase().endsWith('s')) {
+      // Remove 's' for singular
+      const singular = allergenName.toLowerCase().slice(0, -1)
+      variants.push(singular)
+    } else {
+      // Add 's' for plural
+      const plural = allergenName.toLowerCase() + 's'
+      variants.push(plural)
+    }
+    
+    // Handle special cases
+    const allergenLower = allergenName.toLowerCase()
+    const specialCases = {
+      'egg': ['egg', 'eggs'],
+      'eggs': ['egg', 'eggs'],
+      'milk': ['milk', 'dairy'],
+      'dairy': ['milk', 'dairy'],
+      'fish': ['fish', 'fishes'],
+      'nut': ['nut', 'nuts'],
+      'nuts': ['nut', 'nuts'],
+      'tree nuts': ['tree nut', 'tree nuts', 'nuts', 'nut'],
+      'shellfish': ['shellfish', 'seafood'],
+      'seafood': ['shellfish', 'seafood'],
+    }
+    
+    if (allergenLower in specialCases) {
+      variants.push(...specialCases[allergenLower])
+    }
+    
+    return [...new Set(variants)] // Remove duplicates
+  }
+  
+  // Fetch user's allergens for defensive filtering
+  useEffect(() => {
+    const fetchAllergens = async () => {
+      try {
+        const res = await api.get("/api/user-profiles/");
+        if (res.data.length > 0 && res.data[0].allergies) {
+          const allergens = res.data[0].allergies.map(a => a.name?.toLowerCase?.() || a.name || a);
+          // Get all variants for all allergens
+          const allVariants = [];
+          allergens.forEach(allergen => {
+            allVariants.push(...getAllergenVariants(allergen));
+          });
+          setUserAllergens([...new Set(allVariants)]); // Remove duplicates
+        }
+      } catch {
+        setUserAllergens([]);
+      }
+    };
+    fetchAllergens();
+  }, []);
 
   // Fetch user's storage ingredients
   const fetchMyIngredients = async () => {
@@ -32,13 +92,60 @@ function Storage() {
     const fetch = setTimeout(async () => {
       try {
         const res = await api.get(`/api/ingredient-all-data/?search=${searchInput}`)
-        setSearchResults(res.data.map(i => i.name))
+        // Defensive: filter out any ingredient that matches user's allergens (including variants)
+        let names = res.data.map(i => i.name)
+        if (userAllergens.length > 0) {
+          names = names.filter(name => {
+            const nameLower = name.toLowerCase()
+            return !userAllergens.some(allergen => {
+              const allergenLower = allergen.toLowerCase()
+              
+              // Check exact match
+              if (nameLower === allergenLower) return true
+              
+              // Check if ingredient contains allergen
+              if (nameLower.includes(allergenLower)) return true
+              
+              // Handle plural forms
+              if (allergenLower.endsWith('s')) {
+                const singular = allergenLower.slice(0, -1)
+                if (nameLower === singular || nameLower.includes(singular)) return true
+              } else {
+                const plural = allergenLower + 's'
+                if (nameLower === plural || nameLower.includes(plural)) return true
+              }
+              
+              // Handle special cases
+              const specialCases = {
+                'egg': ['egg', 'eggs'],
+                'eggs': ['egg', 'eggs'],
+                'milk': ['milk', 'dairy'],
+                'dairy': ['milk', 'dairy'],
+                'fish': ['fish', 'fishes'],
+                'nut': ['nut', 'nuts'],
+                'nuts': ['nut', 'nuts'],
+                'tree nuts': ['tree nut', 'tree nuts', 'nuts', 'nut'],
+                'shellfish': ['shellfish', 'seafood'],
+                'seafood': ['shellfish', 'seafood'],
+              }
+              
+              if (specialCases[allergenLower]) {
+                return specialCases[allergenLower].some(variant => 
+                  nameLower === variant || nameLower.includes(variant)
+                )
+              }
+              
+              return false
+            })
+          })
+        }
+        setSearchResults(names)
       } catch {
         setSearchResults([])
       }
     }, 300)
     return () => clearTimeout(fetch)
-  }, [searchInput])
+  }, [searchInput, userAllergens])
 
   useEffect(() => {
     fetchMyIngredients()

@@ -8,160 +8,341 @@ import "../assets/layered-waves-haikei.svg"
 import SpotlightCard from "./SpotlightCard"
 
 function Searchbar() {
-  const [searchInput, setSearchInput] = useState("")
-  const [selectedIngredients, setSelectedIngredients] = useState([])
-  const [recipes, setRecipes] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [alerts, setAlerts] = useState([])
-  const [selectedRecipe, setSelectedRecipe] = useState(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [hasSearched, setHasSearched] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [dynamicIngredients, setDynamicIngredients] = useState([])
-  const [filteredIngredients, setFilteredIngredients] = useState([])
-  const [showNoIngredientsMessage, setShowNoIngredientsMessage] = useState(false)
-  const [showAddMealModal, setShowAddMealModal] = useState(false)
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const [isAddingMeal, setIsAddingMeal] = useState(false)
-  const [selectedMealType, setSelectedMealType] = useState('dinner')
-  const recipesPerPage = 4
+  const [searchInput, setSearchInput] = useState("");
+  const [selectedIngredients, setSelectedIngredients] = useState([]);
+  const [recipes, setRecipes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [dynamicIngredients, setDynamicIngredients] = useState([]);
+  const [filteredIngredients, setFilteredIngredients] = useState([]);
+  const [showNoIngredientsMessage, setShowNoIngredientsMessage] = useState(false);
+  const [showAddMealModal, setShowAddMealModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [isAddingMeal, setIsAddingMeal] = useState(false);
+  const [selectedMealType, setSelectedMealType] = useState('dinner');
+  const [userAllergens, setUserAllergens] = useState([]);
+  const [selectedAllergens, setSelectedAllergens] = useState([]);
+  const [showAllRecipes, setShowAllRecipes] = useState(false);
+  const [allAvailableIngredients, setAllAvailableIngredients] = useState([]);
+  const [userDietaryPreference, setUserDietaryPreference] = useState(null);
+  const [useDietFilter, setUseDietFilter] = useState(false);
+  const [isLoadingIngredients, setIsLoadingIngredients] = useState(false);
+  const [dietFilterDebounce, setDietFilterDebounce] = useState(false);
+  const recipesPerPage = 4;
 
-  const staticIngredients = [
-    "egg",
-    "milk",
-    "cheese",
-    "butter",
-    "flour",
-    "sugar",
-    "tomato",
-    "onion",
-    "chicken",
-    "beef",
-    "pasta",
-    "rice",
-    "carrot",
-    "potato",
-    "garlic",
-  ]
+  // Handle diet filter toggle with debounce
+  const handleDietFilterToggle = (checked) => {
+    setDietFilterDebounce(true);
+    setUseDietFilter(checked);
+    // Small delay to prevent rapid toggling
+    setTimeout(() => setDietFilterDebounce(false), 300);
+  };
+
+  // 20 most popular ingredients - shown when no search is entered
+  const popularIngredients = [
+    'salt', 'pepper', 'olive oil', 'garlic', 'onion',
+    'butter', 'flour', 'eggs', 'milk', 'cheese',
+    'tomato', 'chicken', 'beef', 'rice', 'pasta',
+    'sugar', 'lemon', 'herbs', 'potatoes', 'carrots'
+  ];
+  // Fetch user allergens and dietary preference on mount
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const res = await api.get("/api/user-profiles/");
+        if (res.data && res.data.length > 0) {
+          const userProfile = res.data[0];
+          
+          // Handle allergens
+          if (userProfile.allergies && Array.isArray(userProfile.allergies)) {
+            // Get allergy details to get names
+            const allergyPromises = userProfile.allergies.map(async (allergyId) => {
+              try {
+                const allergyRes = await api.get(`/api/allergies/${allergyId}/`);
+                return allergyRes.data.name.toLowerCase();
+              } catch (err) {
+                return null;
+              }
+            });
+            const allergenNames = (await Promise.all(allergyPromises)).filter(name => name !== null);
+            setUserAllergens(allergenNames);
+          }
+          
+          // Handle dietary preference
+          if (userProfile.dietary_preference) {
+            setUserDietaryPreference(userProfile.dietary_preference);
+            setUseDietFilter(true);
+          }
+        }
+      } catch (err) {
+        // fail silently, fallback to backend filtering
+      }
+    };
+    fetchUserProfile();
+  }, []);
+
+  // Fetch all available ingredients on mount
+  useEffect(() => {
+    const fetchAllIngredients = async () => {
+      try {
+        // Use the appropriate endpoint based on diet filter preference
+        const endpoint = useDietFilter ? 
+          "/api/ingredient-all-data/?limit=1000" : 
+          "/api/ingredient-all-data-unfiltered/?limit=1000";
+        
+        const response = await api.get(endpoint);
+        if (response.data && Array.isArray(response.data)) {
+          const ingredients = response.data.map(item => item.name);
+          setAllAvailableIngredients(ingredients);
+        }
+      } catch (error) {
+        console.error("Error fetching all ingredients:", error);
+      }
+    };
+    fetchAllIngredients();
+  }, [useDietFilter]); // Re-fetch when diet filter changes
 
   // Fetch ingredients from API when searchInput changes
   useEffect(() => {
     const fetchIngredients = async () => {
-      if (searchInput.trim() === "") {
-        setDynamicIngredients([])
-        return
-      }
+      setIsLoadingIngredients(true);
       try {
-        // Get 100 ingredients from API
-        const response = await api.get(`/api/ingredient-all-data/?search=${searchInput}&limit=100`)
+        // If no search input, show appropriate ingredients based on diet filter
+        if (searchInput.trim() === "") {
+          let baseIngredients = [];
+          
+          if (useDietFilter && allAvailableIngredients.length > 0) {
+            // If diet filter is on, use random ingredients from the diet-filtered set
+            baseIngredients = [...allAvailableIngredients];
+          } else {
+            // Otherwise, use the popular ingredients
+            baseIngredients = [...popularIngredients];
+          }
+          
+          // Filter out user's allergens
+          const filteredIngredients = baseIngredients.filter(ingredient => 
+            !userAllergens.includes(ingredient.toLowerCase())
+          );
+          
+          // Add random ingredients from all available ingredients to replace any allergens that were selected
+          const additionalCount = selectedAllergens.length;
+          if (additionalCount > 0 && allAvailableIngredients.length > 0) {
+            const availableForReplacement = allAvailableIngredients.filter(ingredient => 
+              !userAllergens.includes(ingredient.toLowerCase()) &&
+              !filteredIngredients.includes(ingredient) &&
+              !selectedIngredients.includes(ingredient)
+            );
+            
+            // Randomly select additional ingredients to replace selected allergens
+            const shuffled = availableForReplacement.sort(() => 0.5 - Math.random());
+            const additionalIngredients = shuffled.slice(0, additionalCount);
+            filteredIngredients.push(...additionalIngredients);
+          }
+          
+          // For diet-filtered ingredients, shuffle them to show random ones
+          if (useDietFilter && filteredIngredients.length > 20) {
+            const shuffled = filteredIngredients.sort(() => 0.5 - Math.random());
+            setDynamicIngredients(shuffled.slice(0, 20));
+            setIsLoadingIngredients(false);
+            return;
+          }
+          
+          // Always ensure we have exactly 20 ingredients if possible
+          if (filteredIngredients.length < 20 && allAvailableIngredients.length > 0) {
+            const needed = 20 - filteredIngredients.length;
+            const availableForFilling = allAvailableIngredients.filter(ingredient => 
+              !userAllergens.includes(ingredient.toLowerCase()) &&
+              !filteredIngredients.includes(ingredient) &&
+              !selectedIngredients.includes(ingredient)
+            );
+            
+            const shuffled = availableForFilling.sort(() => 0.5 - Math.random());
+            const fillerIngredients = shuffled.slice(0, needed);
+            filteredIngredients.push(...fillerIngredients);
+          }
+          
+          setDynamicIngredients(filteredIngredients.slice(0, 20));
+          setIsLoadingIngredients(false);
+          return;
+        }
+
+        // Otherwise, search for ingredients using the appropriate endpoint
+        const endpoint = useDietFilter ? 
+          `/api/ingredient-all-data/?search=${searchInput}&limit=50` : 
+          `/api/ingredient-all-data-unfiltered/?search=${searchInput}&limit=50`;
+        
+        const response = await api.get(endpoint);
         
         if (response.data && Array.isArray(response.data)) {
-          // Process ingredients: get names, filter single words, limit to 12
+          // Process ingredients: get names, limit to 50 for search results
           const processedIngredients = response.data
             .map(item => item.name)
-            .filter(name => !name.includes(' '))
-            .slice(0, 12)
+            .slice(0, 50)
 
           setDynamicIngredients(processedIngredients)
         }
       } catch (error) {
         console.error("Error fetching ingredients:", error)
-        setDynamicIngredients([])
+        // Fallback to popular ingredients filtered by allergens
+        const fallbackIngredients = useDietFilter && allAvailableIngredients.length > 0 
+          ? allAvailableIngredients.filter(ingredient => 
+              !userAllergens.includes(ingredient.toLowerCase())
+            ).sort(() => 0.5 - Math.random()).slice(0, 20)
+          : popularIngredients.filter(ingredient => 
+              !userAllergens.includes(ingredient.toLowerCase())
+            );
+        setDynamicIngredients(fallbackIngredients)
+      } finally {
+        setIsLoadingIngredients(false);
       }
     }
 
     // Add debounce to prevent too many API calls
     const timeoutId = setTimeout(fetchIngredients, 300)
     return () => clearTimeout(timeoutId)
-  }, [searchInput])
+  }, [searchInput, userAllergens, selectedAllergens, selectedIngredients, allAvailableIngredients, useDietFilter]) // Added useDietFilter as dependency
 
-  // Determine which ingredients to display
+  // Determine which ingredients to display (only use API results)
   useEffect(() => {
-    const ingredients = searchInput.trim() === "" ? staticIngredients : dynamicIngredients
+    // Only use ingredients from the API, which are already filtered by dietary preference and allergies
+    const ingredients = dynamicIngredients
 
-    const combinedIngredients = Array.from(new Set([...selectedIngredients, ...ingredients]))
+    const combinedIngredients = Array.from(new Set([...selectedIngredients, ...selectedAllergens, ...ingredients]))
 
     const sortedIngredients = [...combinedIngredients].sort((a, b) => {
-      const isASelected = selectedIngredients.includes(a)
-      const isBSelected = selectedIngredients.includes(b)
+      const isASelected = selectedIngredients.includes(a) || selectedAllergens.includes(a)
+      const isBSelected = selectedIngredients.includes(b) || selectedAllergens.includes(b)
       if (isASelected && !isBSelected) return -1
       if (!isASelected && isBSelected) return 1
       return 0
     })
 
     setFilteredIngredients(sortedIngredients)
-  }, [searchInput, dynamicIngredients, selectedIngredients])
+  }, [dynamicIngredients, selectedIngredients, selectedAllergens])
 
   // Show "No ingredients found" message after a delay if no ingredients are available
   useEffect(() => {
-    if (filteredIngredients.length === 0) {
+    if (filteredIngredients.length === 0 && searchInput.trim() !== "") {
       const timeout = setTimeout(() => {
         setShowNoIngredientsMessage(true)
-      }, 200)
+      }, 500)
 
       return () => clearTimeout(timeout)
     } else {
       setShowNoIngredientsMessage(false)
     }
-  }, [filteredIngredients])
+  }, [filteredIngredients, searchInput])
 
   const toggleIngredient = (ingredient) => {
-    setSelectedIngredients((prev) =>
-      prev.includes(ingredient)
-        ? prev.filter((item) => item !== ingredient)
-        : [...prev, ingredient]
-    )
+    // Check if this ingredient is an allergen
+    const isAllergen = userAllergens.includes(ingredient.toLowerCase());
+    
+    if (isAllergen) {
+      // Handle allergen selection
+      setSelectedAllergens((prev) =>
+        prev.includes(ingredient)
+          ? prev.filter((item) => item !== ingredient)
+          : [...prev, ingredient]
+      );
+    } else {
+      // Handle regular ingredient selection
+      setSelectedIngredients((prev) =>
+        prev.includes(ingredient)
+          ? prev.filter((item) => item !== ingredient)
+          : [...prev, ingredient]
+      );
+    }
   }
+
+  // Helper: filter recipes by user allergens (frontend double-check)
+  const filterRecipesByAllergens = (recipesList) => {
+    if (!userAllergens.length) return recipesList;
+    return recipesList.filter(recipe => {
+      // Check ingredients
+      const ingredientNames = (recipe.ingredients || []).map(i => i.name?.toLowerCase?.() || "");
+      // Check contains_allergens field if present
+      const containsAllergens = (recipe.contains_allergens || []).map(a => a.name?.toLowerCase?.() || "");
+      // If any allergen is present, filter out
+      return !userAllergens.some(allergen =>
+        ingredientNames.some(ing => ing.includes(allergen)) ||
+        containsAllergens.some(ca => ca.includes(allergen))
+      );
+    });
+  };
 
   const handleSearch = async (e) => {
-    setHasSearched(true)
-    if (e) e.preventDefault()
-    setCurrentPage(1)
+    setHasSearched(true);
+    if (e) e.preventDefault();
+    setCurrentPage(1);
     if (selectedIngredients.length === 0) {
-      addAlert("Please select at least one ingredient!")
-      return
+      addAlert("Please select at least one ingredient!");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
-      const response = await api.post("/api/ai-recipe-search/", {
+      const response = await api.post("/api/recipe-search/", {
         ingredients: selectedIngredients,
-      })
-      setRecipes(response.data)
+      });
+      const filtered = filterRecipesByAllergens(response.data);
+      setRecipes(filtered);
+      if (response.data.length > 0 && filtered.length === 0) {
+        addAlert("All found recipes contained your allergens and were filtered out.");
+      }
     } catch (error) {
-      console.error("Error fetching recipes:", error)
-      alert("Failed to fetch recipes. Please try again.")
+      console.error("Error fetching recipes:", error);
+      alert("Failed to fetch recipes. Please try again.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Search recipes by storage ingredients
   const handleStorageSearch = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const res = await api.get("/api/ingredients/")
-      const storageIngredients = res.data.map(i => i.name)
+      const res = await api.get("/api/ingredients/");
+      const storageIngredients = res.data.map(i => i.name);
       if (storageIngredients.length === 0) {
-        addAlert("You have no ingredients in storage!")
-        setLoading(false)
-        return
+        addAlert("You have no ingredients in storage!");
+        setLoading(false);
+        return;
       }
-      setSelectedIngredients(storageIngredients)
-      setSearchInput("")
-      setHasSearched(true)
-      setCurrentPage(1)
-      const response = await api.post("/api/ai-recipe-search/", {
-        ingredients: storageIngredients,
-      })
-      setRecipes(response.data)
+      
+      // Filter out allergens from storage ingredients
+      const safeStorageIngredients = storageIngredients.filter(ingredient => 
+        !userAllergens.includes(ingredient.toLowerCase())
+      );
+      
+      if (safeStorageIngredients.length === 0) {
+        addAlert("All your storage ingredients are allergens!");
+        setLoading(false);
+        return;
+      }
+      
+      setSelectedIngredients(safeStorageIngredients);
+      setSearchInput("");
+      setHasSearched(true);
+      setCurrentPage(1);
+      const response = await api.post("/api/recipe-search/", {
+        ingredients: safeStorageIngredients,
+      });
+      const filtered = filterRecipesByAllergens(response.data);
+      setRecipes(filtered);
+      if (response.data.length > 0 && filtered.length === 0) {
+        addAlert("All found recipes contained your allergens and were filtered out.");
+      }
     } catch (error) {
-      addAlert("Failed to fetch your storage ingredients.")
-      console.error(error)
+      addAlert("Failed to fetch your storage ingredients.");
+      console.error(error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const addAlert = (message) => {
     const id = Date.now()
@@ -288,31 +469,65 @@ function Searchbar() {
           </div>
         </form>
 
+        {/* Diet Filter Toggle */}
+        {userDietaryPreference && (
+          <div className="max-w-md mx-auto mt-4 flex items-center justify-center">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useDietFilter}
+                onChange={(e) => handleDietFilterToggle(e.target.checked)}
+                disabled={dietFilterDebounce}
+                className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 rounded focus:ring-emerald-500 focus:ring-2"
+              />
+              <span className="text-sm font-medium text-spring-green-500">
+                Filter by my diet preferences
+              </span>
+            </label>
+          </div>
+        )}
+
         {/* Ingredient Tiles */}
         <div className="p-5">
           <div className="max-w-4xl mx-auto w-full">
-            <div className="h-66 overflow-y-auto rounded-lg p-4">
-              {filteredIngredients.length === 0 && showNoIngredientsMessage ? (
+            <div className="min-h-[320px] rounded-lg p-4">
+              {isLoadingIngredients || dietFilterDebounce ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+                </div>
+              ) : filteredIngredients.length === 0 && showNoIngredientsMessage ? (
                 <div className="text-center text-gray-500">No ingredients found.</div>
               ) : (
                 <motion.div
+                  key={`ingredient-grid-${useDietFilter ? 'diet' : 'default'}`}
                   layout
-                  className="grid grid-cols-6 gap-4"
-                  transition={{ duration: 0.5 }}
+                  className="grid grid-cols-5 gap-4 justify-items-center"
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
                 >
-                  <AnimatePresence>
-                    {filteredIngredients.map((ingredient) => (
+                  <AnimatePresence mode="wait">
+                    {filteredIngredients.map((ingredient, index) => (
                       <motion.div
-                        key={ingredient}
+                        key={`${ingredient}-${useDietFilter ? 'diet' : 'default'}`}
                         layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                        animate={{ 
+                          opacity: 1, 
+                          scale: 1, 
+                          y: 0,
+                          transition: { 
+                            delay: index * 0.05, 
+                            duration: 0.3, 
+                            ease: "easeInOut" 
+                          }
+                        }}
+                        exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                        transition={{ duration: 0.2, ease: "easeInOut" }}
                         onClick={() => toggleIngredient(ingredient)}
-                        className={`flex items-center justify-center px-6 py-2 border-2 rounded-3xl text-center cursor-pointer ${
+                        className={`flex items-center justify-center px-4 py-3 border-2 rounded-3xl text-center cursor-pointer min-w-[140px] max-w-[140px] h-[50px] text-sm font-medium ${
                           selectedIngredients.includes(ingredient)
                             ? "bg-emerald-500 text-white border-emerald-500"
+                            : selectedAllergens.includes(ingredient)
+                            ? "bg-red-500 text-white border-red-500"
                             : "bg-gunmetal-400 text-white border-office-green-500 hover:bg-emerald-500/20"
                         }`}
                       >
@@ -325,6 +540,33 @@ function Searchbar() {
             </div>
           </div>
         </div>
+
+        {/* Selected Allergies Section */}
+        {selectedAllergens.length > 0 && (
+          <div className="p-5 pt-0">
+            <div className="max-w-4xl mx-auto w-full">
+              <h3 className="text-lg font-semibold text-red-400 mb-3 text-center">
+                Selected Allergies ({selectedAllergens.length})
+              </h3>
+              <div className="flex flex-wrap justify-center gap-2">
+                {selectedAllergens.map((allergen) => (
+                  <div
+                    key={allergen}
+                    className="bg-red-500 text-white px-3 py-1 rounded-full text-sm border-2 border-red-500 flex items-center gap-2"
+                  >
+                    {allergen}
+                    <button
+                      onClick={() => toggleIngredient(allergen)}
+                      className="hover:bg-red-600 rounded-full w-4 h-4 flex items-center justify-center"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Search Button */}
         <div className="flex justify-center mt-4 px-5 mb-6">
@@ -346,7 +588,7 @@ function Searchbar() {
         ) : recipes.length > 0 ? (
           <>
             <div className="flex flex-wrap justify-center gap-6">
-              {paginatedRecipes.slice(0, 4).map((recipe, idx) => (
+              {recipes.slice(0, 3).map((recipe, idx) => (
                 <SpotlightCard
                   key={recipe.id ? `${recipe.id}-${idx}` : idx}
                   className="custom-spotlight-card"
@@ -367,33 +609,15 @@ function Searchbar() {
                 </SpotlightCard>
               ))}
             </div>
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center mt-6 gap-4">
+            
+            {/* Show All Recipes Button */}
+            {recipes.length > 3 && (
+              <div className="flex justify-center mt-6">
                 <button
-                  onClick={handlePrevPage}
-                  disabled={currentPage === 1}
-                  className={`px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white font-bold transition-colors ${
-                    currentPage === 1
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:bg-emerald-500 hover:border-emerald-500"
-                  }`}
+                  onClick={() => setShowAllRecipes(true)}
+                  className="px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
                 >
-                  Prev
-                </button>
-                <span className="text-spring-white-400 font-bold">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages}
-                  className={`px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white font-bold transition-colors ${
-                    currentPage === totalPages
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:bg-emerald-500 hover:border-emerald-500"
-                  }`}
-                >
-                  Next
+                  Show All {recipes.length} Recipes
                 </button>
               </div>
             )}
@@ -529,6 +753,57 @@ function Searchbar() {
               >
                 {isAddingMeal ? 'Adding...' : 'Add to Calendar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Show All Recipes Modal */}
+      {showAllRecipes && (
+        <div
+          className="fixed inset-0 bg-gunmetal-500/80 backdrop-blur-sm flex justify-center items-center z-50"
+          onClick={() => setShowAllRecipes(false)}
+        >
+          <div
+            className="bg-gunmetal-300 rounded-lg shadow-xl p-6 max-w-6xl w-full max-h-[90vh] overflow-y-auto m-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-spring-green-400">
+                All Recipes ({recipes.length})
+              </h2>
+              <button
+                onClick={() => setShowAllRecipes(false)}
+                className="text-white hover:text-spring-green-400 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recipes.map((recipe, idx) => (
+                <SpotlightCard
+                  key={recipe.id ? `${recipe.id}-${idx}` : idx}
+                  className="custom-spotlight-card"
+                  spotlightColor="rgba(0, 229, 255, 0.2)"
+                >
+                  <div
+                    className="bg-gunmetal-400 border-2 border-office-green-500 rounded-lg p-4 h-40 flex flex-col justify-between cursor-pointer hover:bg-emerald-500/20 transition-colors"
+                    onClick={() => {
+                      setShowAllRecipes(false);
+                      openModal(recipe);
+                    }}
+                  >
+                    <h3 className="text-lg font-bold text-spring-green-400 mb-2">
+                      {recipe.name}
+                    </h3>
+                    <p className="text-white text-sm">
+                      Ingredients:{" "}
+                      {recipe.ingredients.map((ingredient) => ingredient.name).join(", ")}
+                    </p>
+                  </div>
+                </SpotlightCard>
+              ))}
             </div>
           </div>
         </div>
