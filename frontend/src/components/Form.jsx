@@ -235,11 +235,11 @@ function Form({ route, method, onLogin }) {
                       console.log("Current user profile:", currentUserProfile) // Debug log
                       
                       if (currentUserProfile) {
-                        console.log("Dietary preferences:", currentUserProfile.dietary_preferences) // Debug log
+                        console.log("Dietary preference:", currentUserProfile.dietary_preference) // Debug log
                         console.log("Allergies:", currentUserProfile.allergies) // Debug log
                         
                         // If user has no preferences/allergies set, show the popup
-                        if ((!currentUserProfile.dietary_preferences || currentUserProfile.dietary_preferences.length === 0) && 
+                        if (!currentUserProfile.dietary_preference && 
                             (!currentUserProfile.allergies || currentUserProfile.allergies.length === 0)) {
                           console.log("Showing preferences popup") // Debug log
                           setShowPreferencesPopup(true)
