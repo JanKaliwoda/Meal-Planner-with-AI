@@ -11,6 +11,11 @@ function Storage() {
   const [adding, setAdding] = useState(false)
   const [alerts, setAlerts] = useState([])
   const [userAllergens, setUserAllergens] = useState([])
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [selectedIngredientName, setSelectedIngredientName] = useState("")
+  const [expirationDate, setExpirationDate] = useState("")
+  const [quantity, setQuantity] = useState(1)
+  const [notes, setNotes] = useState("")
   
   // Helper function to get allergen variants
   const getAllergenVariants = (allergenName) => {
@@ -151,15 +156,33 @@ function Storage() {
     fetchMyIngredients()
   }, [])
 
-  // Add ingredient to storage
+  // Add ingredient to storage - show modal
   const handleAdd = async (name) => {
+    setSelectedIngredientName(name)
+    setShowAddModal(true)
+  }
+
+  // Add ingredient with details
+  const handleAddWithDetails = async () => {
     setAdding(true)
     try {
-      await api.post("/api/ingredients/add_from_global/", { name })
-      addAlert(`Added "${name}" to your storage!`)
+      const data = { name: selectedIngredientName, quantity }
+      if (expirationDate) {
+        data.expiration_date = expirationDate
+      }
+      if (notes.trim()) {
+        data.notes = notes.trim()
+      }
+      
+      await api.post("/api/ingredients/add_from_global/", data)
+      addAlert(`Added "${selectedIngredientName}" to your storage!`)
       fetchMyIngredients()
       setSearchInput("")
       setSearchResults([])
+      setShowAddModal(false)
+      setExpirationDate("")
+      setQuantity(1)
+      setNotes("")
     } catch {
       addAlert("Failed to add ingredient.")
     } finally {
@@ -175,6 +198,21 @@ function Storage() {
       fetchMyIngredients()
     } catch {
       addAlert("Failed to remove ingredient.")
+    }
+  }
+
+  // Add missing ingredients from recipe to shopping list
+  const handleAddToShoppingList = async (recipeId, recipeName) => {
+    try {
+      const response = await api.post(`/api/recipes/${recipeId}/add_missing_ingredients_to_shopping_list/`)
+      
+      if (response.data.added && response.data.added.length > 0) {
+        addAlert(`Added ${response.data.added.length} ingredients from "${recipeName}" to shopping list!`)
+      } else {
+        addAlert(response.data.detail || "All ingredients already in your storage!")
+      }
+    } catch (error) {
+      addAlert("Failed to add ingredients to shopping list.")
     }
   }
 
@@ -230,6 +268,95 @@ function Storage() {
         )}
       </div>
 
+      {/* Add Ingredient Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gunmetal-300 rounded-lg shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-spring-green-500 mb-4">
+              Add "{selectedIngredientName}"
+            </h3>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-spring-green-400 text-sm font-bold mb-3">
+                  Quantity
+                </label>
+                <div className="flex items-center justify-center space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white font-bold text-lg flex items-center justify-center transition-colors"
+                  >
+                    −
+                  </button>
+                  <div className="flex-1 text-center">
+                    <input
+                      type="number"
+                      min="1"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-20 text-center text-2xl font-bold px-3 py-2 rounded-lg border-2 border-office-green-500 bg-gunmetal-400 text-white focus:outline-none focus:border-emerald-500"
+                    />
+                    <p className="text-gray-400 text-xs mt-1">units</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="w-10 h-10 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-lg flex items-center justify-center transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-spring-green-400 text-sm font-bold mb-2">
+                  Expiration Date (Optional)
+                </label>
+                <input
+                  type="date"
+                  value={expirationDate}
+                  onChange={(e) => setExpirationDate(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg border-2 border-office-green-500 bg-gunmetal-400 text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-spring-green-400 text-sm font-bold mb-2">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add any notes about this ingredient..."
+                  rows="3"
+                  className="w-full px-4 py-2 rounded-lg border-2 border-office-green-500 bg-gunmetal-400 text-white focus:outline-none focus:border-emerald-500 resize-none"
+                />
+                <p className="text-gray-400 text-xs mt-1">
+                  e.g., "From farmer's market", "Organic", "For dinner party"
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddWithDetails}
+                disabled={adding}
+                className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                {adding ? "Adding..." : "Add to Storage"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Storage List */}
       <div className="w-full max-w-3xl">
         {loading ? (
@@ -237,14 +364,37 @@ function Storage() {
             <span className="loading loading-dots loading-xl"></span>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {myIngredients.map(ingredient => (
               <SpotlightCard key={ingredient.id} className="w-full">
-                <div className="flex items-center justify-between p-4">
-                  <span className="text-lg text-spring-green-400 font-semibold">{ingredient.name}</span>
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-lg text-spring-green-400 font-semibold">
+                      {ingredient.name}
+                    </span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-400">Qty:</span>
+                      <div className="bg-emerald-500 text-white px-2 py-1 rounded-full text-sm font-bold min-w-[2rem] text-center">
+                        {ingredient.quantity || 1}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {ingredient.expiration_date && (
+                    <div className="text-xs p-2 rounded border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 mb-2">
+                      Expires: {new Date(ingredient.expiration_date).toLocaleDateString()}
+                    </div>
+                  )}
+
+                  {ingredient.notes && (
+                    <div className="text-xs p-2 rounded border border-gray-500/30 bg-gray-500/10 text-gray-300 mb-2">
+                      <span className="font-semibold">Notes:</span> {ingredient.notes}
+                    </div>
+                  )}
+
                   <button
                     onClick={() => handleRemove(ingredient.id)}
-                    className="px-3 py-1 rounded-full border-2 border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+                    className="w-full px-3 py-1 rounded-lg border-2 border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition-colors text-sm"
                   >
                     Remove
                   </button>

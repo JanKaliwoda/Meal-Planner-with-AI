@@ -331,6 +331,7 @@ class IngredientViewSet(viewsets.ModelViewSet):
         name = request.data.get("name")
         quantity = request.data.get("quantity", 1)
         expiration_date = request.data.get("expiration_date")
+        notes = request.data.get("notes", "")
         
         if not name:
             return Response({"error": "No ingredient name provided."}, status=400)
@@ -340,16 +341,19 @@ class IngredientViewSet(viewsets.ModelViewSet):
         except IngredientAllData.DoesNotExist:
             return Response({"error": "Ingredient does not exist."}, status=404)
         
-        ingredient, created = Ingredient.objects.get_or_create(
-            user=request.user, name=base.name,
-            defaults={"quantity": quantity, "expiration_date": expiration_date}
-        )
+        # Always create a new ingredient entry (allow multiple of same ingredient)
+        ingredient_data = {
+            "user": request.user,
+            "name": base.name,
+            "quantity": quantity,
+            "expiration_date": expiration_date,
+            "notes": notes
+        }
         
-        if not created:
-            ingredient.quantity += int(quantity)
-            if expiration_date:
-                ingredient.expiration_date = expiration_date
-            ingredient.save()
+        # Remove None values
+        ingredient_data = {k: v for k, v in ingredient_data.items() if v is not None}
+        
+        ingredient = Ingredient.objects.create(**ingredient_data)
         
         return Response(IngredientSerializer(ingredient).data)
 
@@ -617,25 +621,9 @@ class RecipeSearchView(APIView):
         if not ingredient_names or not isinstance(ingredient_names, list):
             return Response({"error": "A list of ingredients is required."}, status=400)
 
-        # First, filter out any ingredients that are allergens if user is authenticated
-        if request.user.is_authenticated:
-            try:
-                user_profile = UserProfile.objects.get(user=request.user)
-                if user_profile.allergies.exists():
-                    user_allergen_names = get_user_allergen_filters(request.user)
-                    if user_allergen_names:
-                        # Filter out ingredients that contain any allergen names with exceptions
-                        safe_ingredients = []
-                        for ingredient_name in ingredient_names:
-                            if is_ingredient_safe_from_allergens(ingredient_name, user_allergen_names):
-                                safe_ingredients.append(ingredient_name)
-                        ingredient_names = safe_ingredients
-            except UserProfile.DoesNotExist:
-                pass
-
-        if not ingredient_names:
-            return Response({"error": "No safe ingredients provided after filtering allergens."}, status=400)
-
+        # Remove this entire allergen filtering section for ingredients
+        # Users should be able to search with any ingredient
+        
         # Ensure all ingredients exist in IngredientAllData
         ingredients_qs = IngredientAllData.objects.filter(name__in=ingredient_names)
         ingredients = list(ingredients_qs.values_list('name', flat=True))
@@ -644,7 +632,6 @@ class RecipeSearchView(APIView):
             return Response({"error": "No matching ingredients found."}, status=400)
 
         # Pure matching algorithm: Find recipes that contain ALL the selected ingredients
-        # This ensures recipes must have every ingredient you search with
         matching_recipes = Recipe.objects.filter(
             ingredients__name__in=ingredients
         ).annotate(
