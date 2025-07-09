@@ -200,8 +200,11 @@ class GoogleLoginView(APIView):
                 "username": username,
             })
 
-            if created:
-                UserProfile.objects.create(user=user)
+            # Create UserProfile if it doesn't exist
+            if created or not UserProfile.objects.filter(user=user).exists():
+                UserProfile.objects.get_or_create(user=user, defaults={
+                    'dietary_preference': None
+                })
 
             refresh = RefreshToken.for_user(user)
 
@@ -236,7 +239,32 @@ class UserProfileViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         return UserProfile.objects.filter(user=self.request.user)
-
+    
+    def perform_create(self, serializer):
+        # Ensure user field is set and no duplicate profiles
+        user = self.request.user
+        if UserProfile.objects.filter(user=user).exists():
+            # If profile already exists, update it instead of creating new one
+            existing_profile = UserProfile.objects.get(user=user)
+            for key, value in serializer.validated_data.items():
+                setattr(existing_profile, key, value)
+            existing_profile.save()
+            return existing_profile
+        else:
+            serializer.save(user=user)
+    
+    def create(self, request, *args, **kwargs):
+        # Check if user already has a profile
+        if UserProfile.objects.filter(user=request.user).exists():
+            # Update existing profile instead of creating new one
+            profile = UserProfile.objects.get(user=request.user)
+            serializer = self.get_serializer(profile, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            # Create new profile
+            return super().create(request, *args, **kwargs)
 
 class DietaryPreferenceViewSet(viewsets.ModelViewSet):
     queryset = DietaryPreference.objects.all()
