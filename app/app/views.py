@@ -52,6 +52,74 @@ def normalize_title(title):
     return title.strip().lower().replace("'", "'").replace("`", "'").replace(""", '"').replace(""", '"')
 
 
+def get_related_allergens(allergen_name):
+    """Get all related allergen names for comprehensive filtering"""
+    allergen_map = {
+        'milk': ['milk', 'dairy', 'lactose', 'casein', 'whey', 'butter', 'cream', 'cheese', 'yogurt', 'sour cream', 'cream cheese', 'ice cream'],
+        'eggs': ['eggs', 'egg', 'egg white', 'egg yolk', 'albumin'],
+        'peanuts': ['peanuts', 'peanut', 'peanut butter', 'groundnut'],
+        'tree nuts': ['almonds', 'walnuts', 'cashews', 'pistachios', 'hazelnuts', 'brazil nuts', 'pecans', 'macadamia nuts', 'pine nuts', 'chestnuts', 'tree nuts'],
+        'soy': ['soy', 'soya', 'soybean', 'tofu', 'tempeh', 'miso', 'soy sauce', 'edamame'],
+        'fish': ['fish', 'salmon', 'tuna', 'cod', 'halibut', 'sardines', 'anchovies', 'mackerel', 'trout'],
+        'shellfish': ['shellfish', 'shrimp', 'crab', 'lobster', 'oysters', 'mussels', 'clams', 'scallops', 'prawns'],
+        'wheat': ['wheat', 'flour', 'bread', 'pasta', 'cereals', 'crackers', 'cookies'],
+        'sesame': ['sesame', 'sesame seeds', 'tahini', 'sesame oil'],
+        'gluten': ['gluten', 'wheat', 'barley', 'rye', 'oats', 'spelt', 'kamut', 'triticale', 'bulgur', 'semolina', 'durum'],
+        'sulphites': ['sulphites', 'sulfites', 'sulfur dioxide', 'sodium sulfite'],
+        'corn': ['corn', 'maize', 'corn starch', 'corn syrup', 'cornmeal'],
+        'mustard': ['mustard', 'mustard seeds', 'dijon mustard'],
+        'celery': ['celery', 'celery seeds', 'celeriac'],
+        'lupin': ['lupin', 'lupine'],
+        'coconut': ['coconut', 'coconut oil', 'coconut milk', 'coconut cream'],
+        'yeast': ['yeast', 'nutritional yeast', 'bakers yeast'],
+        'chocolate': ['chocolate', 'cocoa', 'cacao', 'dark chocolate', 'milk chocolate'],
+        'tomatoes': ['tomatoes', 'tomato', 'tomato sauce', 'ketchup', 'marinara'],
+        'citrus': ['citrus', 'lemon', 'lime', 'orange', 'grapefruit', 'tangerine'],
+    }
+    
+    # Check if the allergen is in our map
+    for key, values in allergen_map.items():
+        if allergen_name.lower() in values:
+            return values
+    
+    # If not found in map, return the allergen itself
+    return [allergen_name.lower()]
+
+
+def get_user_allergen_filters(user):
+    """Get comprehensive allergen filter for a user"""
+    try:
+        user_profile = UserProfile.objects.get(user=user)
+        if user_profile.allergies.exists():
+            all_allergen_names = set()
+            for allergy in user_profile.allergies.all():
+                related_allergens = get_related_allergens(allergy.name)
+                all_allergen_names.update(related_allergens)
+            return list(all_allergen_names)
+    except UserProfile.DoesNotExist:
+        pass
+    return []
+
+
+def is_ingredient_safe_from_allergens(ingredient_name, user_allergen_names):
+    """Check if an ingredient is safe from user's allergens, with exceptions"""
+    ingredient_lower = ingredient_name.lower()
+    
+    # Exception: eggplant should not be filtered out even if "egg" is in allergens
+    if ingredient_lower == 'eggplant':
+        return True
+    
+    if ingredient_lower == "milk chocolate":
+        return True
+    
+    # Check if ingredient contains any allergen names
+    for allergen_name in user_allergen_names:
+        if allergen_name.lower() in ingredient_lower:
+            return False
+    
+    return True
+
+
 # =====================================
 # AUTHENTICATION & USER MANAGEMENT
 # =====================================
@@ -328,15 +396,21 @@ class IngredientAllDataViewSet(viewsets.ModelViewSet):
                 if user_profile.dietary_preference:
                     queryset = queryset.filter(dietary_preferences=user_profile.dietary_preference)
                 
-                # Exclude ingredients that contain user's allergens
+                # Exclude ingredients that contain user's allergens using comprehensive filtering
                 if user_profile.allergies.exists():
-                    user_allergens = user_profile.allergies.all()
-                    queryset = queryset.exclude(contains_allergens__in=user_allergens)
-                
-                # Also exclude ingredients that ARE the user's allergens themselves
-                if user_profile.allergies.exists():
-                    user_allergens = user_profile.allergies.all()
-                    queryset = queryset.exclude(contains_allergens__in=user_allergens)
+                    user_allergen_names = get_user_allergen_filters(self.request.user)
+                    if user_allergen_names:
+                        # Filter out unsafe ingredients with exceptions
+                        safe_ingredients = []
+                        for ingredient in queryset:
+                            if is_ingredient_safe_from_allergens(ingredient.name, user_allergen_names):
+                                safe_ingredients.append(ingredient.id)
+                        
+                        queryset = queryset.filter(id__in=safe_ingredients)
+                        
+                        # Also exclude by contains_allergens relationship
+                        user_allergens = user_profile.allergies.all()
+                        queryset = queryset.exclude(contains_allergens__in=user_allergens)
                     
             except UserProfile.DoesNotExist:
                 pass
@@ -365,14 +439,19 @@ class IngredientAllDataUnfilteredViewSet(viewsets.ModelViewSet):
             try:
                 user_profile = UserProfile.objects.get(user=self.request.user)
                 if user_profile.allergies.exists():
-                    user_allergens = user_profile.allergies.all()
-                    user_allergen_names = user_allergens.values_list('name', flat=True)
-                    
-                    # Exclude ingredients that ARE allergens or contain user's allergens
-                    queryset = queryset.exclude(
-                        Q(contains_allergens__in=user_allergens) | 
-                        Q(name__in=user_allergen_names)
-                    )
+                    user_allergen_names = get_user_allergen_filters(self.request.user)
+                    if user_allergen_names:
+                        # Filter out unsafe ingredients with exceptions
+                        safe_ingredients = []
+                        for ingredient in queryset:
+                            if is_ingredient_safe_from_allergens(ingredient.name, user_allergen_names):
+                                safe_ingredients.append(ingredient.id)
+                        
+                        queryset = queryset.filter(id__in=safe_ingredients)
+                        
+                        # Also exclude by contains_allergens relationship
+                        user_allergens = user_profile.allergies.all()
+                        queryset = queryset.exclude(contains_allergens__in=user_allergens)
                     
             except UserProfile.DoesNotExist:
                 pass
@@ -396,14 +475,34 @@ class RecipeViewSet(viewsets.ModelViewSet):
             try:
                 user_profile = UserProfile.objects.get(user=self.request.user)
                 
-                # Filter by dietary preference
+                # Filter by dietary preference - make it more permissive
                 if user_profile.dietary_preference:
-                    queryset = queryset.filter(suitable_for_diets=user_profile.dietary_preference)
+                    # Use Q objects to handle cases where the relationship might not exist
+                    queryset = queryset.filter(
+                        Q(suitable_for_diets=user_profile.dietary_preference) |
+                        Q(suitable_for_diets__isnull=True)
+                    )
                 
-                # Exclude recipes that contain user's allergens
+                # Exclude recipes that contain user's allergens using comprehensive filtering
                 if user_profile.allergies.exists():
-                    user_allergens = user_profile.allergies.all()
-                    queryset = queryset.exclude(contains_allergens__in=user_allergens)
+                    user_allergen_names = get_user_allergen_filters(self.request.user)
+                    if user_allergen_names:
+                        # Filter out recipes with unsafe ingredients with exceptions
+                        safe_recipes = []
+                        for recipe in queryset:
+                            recipe_safe = True
+                            for ingredient in recipe.ingredients.all():
+                                if not is_ingredient_safe_from_allergens(ingredient.name, user_allergen_names):
+                                    recipe_safe = False
+                                    break
+                            if recipe_safe:
+                                safe_recipes.append(recipe.id)
+                        
+                        queryset = queryset.filter(id__in=safe_recipes)
+                        
+                        # Also exclude by contains_allergens relationship
+                        user_allergens = user_profile.allergies.all()
+                        queryset = queryset.exclude(contains_allergens__in=user_allergens)
                     
             except UserProfile.DoesNotExist:
                 pass
@@ -475,14 +574,33 @@ def matching_recipes(request):
     try:
         user_profile = UserProfile.objects.get(user=request.user)
         
-        # Filter by dietary preference
+        # Filter by dietary preference - make it more permissive
         if user_profile.dietary_preference:
-            matching = matching.filter(suitable_for_diets=user_profile.dietary_preference)
+            matching = matching.filter(
+                Q(suitable_for_diets=user_profile.dietary_preference) |
+                Q(suitable_for_diets__isnull=True)
+            )
         
-        # Exclude recipes that contain user's allergens
+        # Exclude recipes that contain user's allergens using comprehensive filtering
         if user_profile.allergies.exists():
-            user_allergens = user_profile.allergies.all()
-            matching = matching.exclude(contains_allergens__in=user_allergens)
+            user_allergen_names = get_user_allergen_filters(request.user)
+            if user_allergen_names:
+                # Filter out recipes with unsafe ingredients with exceptions
+                safe_recipes = []
+                for recipe in matching:
+                    recipe_safe = True
+                    for ingredient in recipe.ingredients.all():
+                        if not is_ingredient_safe_from_allergens(ingredient.name, user_allergen_names):
+                            recipe_safe = False
+                            break
+                    if recipe_safe:
+                        safe_recipes.append(recipe.id)
+                
+                matching = matching.filter(id__in=safe_recipes)
+                
+                # Also exclude by contains_allergens relationship
+                user_allergens = user_profile.allergies.all()
+                matching = matching.exclude(contains_allergens__in=user_allergens)
             
     except UserProfile.DoesNotExist:
         pass
@@ -504,18 +622,14 @@ class RecipeSearchView(APIView):
             try:
                 user_profile = UserProfile.objects.get(user=request.user)
                 if user_profile.allergies.exists():
-                    user_allergens = user_profile.allergies.all()
-                    user_allergen_names = user_allergens.values_list('name', flat=True)
-                    
-                    # Filter out ingredients that ARE allergens or contain user's allergens
-                    safe_ingredients = IngredientAllData.objects.filter(
-                        name__in=ingredient_names
-                    ).exclude(
-                        Q(contains_allergens__in=user_allergens) | 
-                        Q(name__in=user_allergen_names)
-                    )
-                    
-                    ingredient_names = list(safe_ingredients.values_list('name', flat=True))
+                    user_allergen_names = get_user_allergen_filters(request.user)
+                    if user_allergen_names:
+                        # Filter out ingredients that contain any allergen names with exceptions
+                        safe_ingredients = []
+                        for ingredient_name in ingredient_names:
+                            if is_ingredient_safe_from_allergens(ingredient_name, user_allergen_names):
+                                safe_ingredients.append(ingredient_name)
+                        ingredient_names = safe_ingredients
             except UserProfile.DoesNotExist:
                 pass
 
@@ -544,14 +658,33 @@ class RecipeSearchView(APIView):
             try:
                 user_profile = UserProfile.objects.get(user=request.user)
                 
-                # Filter by dietary preference
+                # Filter by dietary preference - make it more permissive
                 if user_profile.dietary_preference:
-                    matching_recipes = matching_recipes.filter(suitable_for_diets=user_profile.dietary_preference)
+                    matching_recipes = matching_recipes.filter(
+                        Q(suitable_for_diets=user_profile.dietary_preference) |
+                        Q(suitable_for_diets__isnull=True)
+                    )
                 
-                # Exclude recipes that contain user's allergens
+                # Exclude recipes that contain user's allergens using comprehensive filtering
                 if user_profile.allergies.exists():
-                    user_allergens = user_profile.allergies.all()
-                    matching_recipes = matching_recipes.exclude(contains_allergens__in=user_allergens)
+                    user_allergen_names = get_user_allergen_filters(request.user)
+                    if user_allergen_names:
+                        # Filter out recipes with unsafe ingredients with exceptions
+                        safe_recipes = []
+                        for recipe in matching_recipes:
+                            recipe_safe = True
+                            for ingredient in recipe.ingredients.all():
+                                if not is_ingredient_safe_from_allergens(ingredient.name, user_allergen_names):
+                                    recipe_safe = False
+                                    break
+                            if recipe_safe:
+                                safe_recipes.append(recipe.id)
+                        
+                        matching_recipes = matching_recipes.filter(id__in=safe_recipes)
+                        
+                        # Also exclude by contains_allergens relationship
+                        user_allergens = user_profile.allergies.all()
+                        matching_recipes = matching_recipes.exclude(contains_allergens__in=user_allergens)
                 
             except UserProfile.DoesNotExist:
                 pass
