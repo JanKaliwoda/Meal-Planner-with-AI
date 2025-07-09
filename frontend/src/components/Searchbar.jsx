@@ -519,6 +519,131 @@ function Searchbar() {
     setShoppingList([]);
   };
 
+  // Helper function to get country flag emoji
+  const getCountryFlag = (nationality) => {
+    if (!nationality) return '🌍'; // Default fallback
+    
+    const countryFlags = {
+      // Match the exact cuisine types from the AI categorization script
+      'italian': '🇮🇹',
+      'mexican': '🇲🇽',
+      'asian': '🥢',
+      'american': '🇺🇸',
+      'mediterranean': '🌊',
+      'indian': '🇮🇳',
+      'thai': '🇹🇭',
+      'chinese': '🇨🇳',
+      'french': '🇫🇷',
+      'greek': '🇬🇷',
+      'middle eastern': '🕌',
+      'japanese': '🇯🇵',
+      'korean': '🇰🇷',
+      'spanish': '🇪🇸',
+      'british': '🇬🇧',
+      'german': '🇩🇪',
+      'other': '🌍',
+    };
+    
+    const normalizedNationality = nationality.toLowerCase().trim();
+    return countryFlags[normalizedNationality] || '🌍'; // Always return a flag
+  };
+
+  // Helper function to get difficulty stars
+  const getDifficultyStars = (difficulty) => {
+    const level = difficulty?.toLowerCase();
+    switch(level) {
+      case 'easy': 
+      case 'beginner':
+      case '1': return '⭐';
+      case 'medium': 
+      case 'intermediate':
+      case '2': return '⭐⭐';
+      case 'hard': 
+      case 'difficult':
+      case 'advanced':
+      case '3': return '⭐⭐⭐';
+      default: return '⭐';
+    }
+  };
+
+
+// Helper function to format cooking time
+const formatCookingTime = (time) => {
+  if (!time) return null;
+  
+  if (typeof time === 'string') {
+    // Handle different string formats
+    const lowerTime = time.toLowerCase();
+    
+    // Check for hour patterns first
+    const hourMatch = lowerTime.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)/);
+    if (hourMatch) {
+      const hours = parseFloat(hourMatch[1]);
+      if (hours >= 1) {
+        return hours % 1 === 0 ? `${hours}h` : `${hours}h`;
+      }
+    }
+    
+    // Check for minute patterns
+    const minuteMatch = lowerTime.match(/(\d+)\s*(?:minutes?|mins?|m)/);
+    if (minuteMatch) {
+      const minutes = parseInt(minuteMatch[1]);
+      if (minutes >= 60) {
+        const hours = Math.floor(minutes / 60);
+        const remainingMins = minutes % 60;
+        return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
+      }
+      return `${minutes}m`;
+    }
+    
+    // Check for combined format like "1h 30m" or "1 hour 30 minutes"
+    const combinedMatch = lowerTime.match(/(\d+)\s*(?:hours?|hrs?|h)\s*(?:and\s*)?(\d+)\s*(?:minutes?|mins?|m)/);
+    if (combinedMatch) {
+      const hours = parseInt(combinedMatch[1]);
+      const minutes = parseInt(combinedMatch[2]);
+      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+    }
+    
+    // Fallback: extract just numbers and assume minutes if under 10, hours if over
+    const numberMatch = time.match(/\d+/);
+    if (numberMatch) {
+      const num = parseInt(numberMatch[0]);
+      if (num >= 60) {
+        const hours = Math.floor(num / 60);
+        const remainingMins = num % 60;
+        return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
+      }
+      return `${num}m`;
+    }
+  }
+  
+  // Handle numeric values (assume minutes)
+  if (typeof time === 'number') {
+    if (time >= 60) {
+      const hours = Math.floor(time / 60);
+      const remainingMins = time % 60;
+      return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
+    }
+    return `${time}m`;
+  }
+  
+  return null;
+};
+
+  // Helper function to get recipe metadata with actual database fields
+  const getRecipeMetadata = (recipe) => {
+    // Check multiple possible field names for nationality/cuisine
+    const nationality = recipe.nationality || recipe.cuisine_type || recipe.cuisineType || null;
+    const cookingTime = recipe.cooking_time || recipe.cookingTime || null;
+    const difficulty = recipe.difficulty || null;
+    
+    return {
+      nationality,
+      cookingTime,
+      difficulty
+    };
+  };
+
   return (
     <div className="bg-gunmetal-500/0">
       <div className="">
@@ -696,27 +821,130 @@ function Searchbar() {
           </div>
         ) : recipes.length > 0 ? (
           <>
-            <div className="flex flex-wrap justify-center gap-6">
-              {recipes.slice(0, 3).map((recipe, idx) => (
-                <SpotlightCard
-                  key={recipe.id ? `${recipe.id}-${idx}` : idx}
-                  className="custom-spotlight-card"
-                  spotlightColor="rgba(0, 229, 255, 0.2)"
-                >
-                  <div
-                    className="bg-gunmetal-300 border-2 border-office-green-500 rounded-lg p-4 w-80 h-34 flex flex-col justify-between cursor-pointer hover:bg-emerald-500/20 transition-colors"
-                    onClick={() => openModal(recipe)}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+              {recipes.slice(0, 3).map((recipe, idx) => {
+                const missingIngredients = getMissingIngredients(recipe);
+                const hasAllIngredients = missingIngredients.length === 0;
+                const metadata = getRecipeMetadata(recipe);
+                
+                return (
+                  <SpotlightCard
+                    key={recipe.id ? `${recipe.id}-${idx}` : idx}
+                    className="custom-spotlight-card"
+                    spotlightColor="rgba(0, 229, 255, 0.2)"
                   >
-                    <h3 className="text-lg font-bold text-spring-green-400 mb-2">
-                      {recipe.name}
-                    </h3>
-                    <p className="text-white mb-4 truncate">
-                      Ingredients:{" "}
-                      {recipe.ingredients.map((ingredient) => ingredient.name).join(", ")}
-                    </p>
-                  </div>
-                </SpotlightCard>
-              ))}
+                    <div className="bg-gunmetal-300 border-2 border-office-green-500 rounded-lg p-4 h-80 flex flex-col">
+                      <div className="flex-1 flex flex-col">
+                        {/* Header with title and status */}
+                        <div className="flex justify-between items-start mb-3">
+                          <h3 
+                            className="text-lg font-bold text-spring-green-400 cursor-pointer hover:text-emerald-400 transition-colors flex-1 line-clamp-2 min-h-[3.5rem]"
+                            onClick={() => openModal(recipe)}
+                          >
+                            {recipe.name}
+                          </h3>
+                          <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                            {hasAllIngredients ? (
+                              <span className="text-green-400 text-xs font-medium bg-green-500/20 px-2 py-1 rounded-full whitespace-nowrap">
+                                ✓ Ready
+                              </span>
+                            ) : (
+                              <span className="text-orange-400 text-xs font-medium bg-orange-500/20 px-2 py-1 rounded-full whitespace-nowrap">
+                                {missingIngredients.length} missing
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Recipe Metadata Row - Always show nationality if it exists */}
+                        <div className="flex items-center gap-2 mb-3 text-sm flex-wrap min-h-[2rem]">
+                          {/* Nationality - show if exists or if we want to debug */}
+                          {metadata.nationality && (
+                            <div 
+                              className="flex items-center gap-1 bg-gunmetal-400/50 px-2 py-1 rounded-full cursor-help hover:bg-gunmetal-400/70 transition-colors"
+                              title={`Cuisine: ${metadata.nationality}`}
+                            >
+                              <span className="text-lg">{getCountryFlag(metadata.nationality)}</span>
+                              <span className="text-gray-300 text-xs capitalize">{metadata.nationality}</span>
+                            </div>
+                          )}
+                          
+                          {/* Cooking Time - only show if exists */}
+                          {metadata.cookingTime && (
+                            <div 
+                              className="flex items-center gap-1 bg-blue-500/20 px-2 py-1 rounded-full"
+                              title={`Cooking time: ${formatCookingTime(metadata.cookingTime)}`}
+                            >
+                              <span className="text-sm">🕐</span>
+                              <span className="text-blue-300 text-xs">{formatCookingTime(metadata.cookingTime)}</span>
+                            </div>
+                          )}
+                          
+                          {/* Difficulty - only show if exists */}
+                          {metadata.difficulty && (
+                            <div 
+                              className="flex items-center gap-1 bg-yellow-500/20 px-2 py-1 rounded-full cursor-help hover:bg-yellow-500/30 transition-colors"
+                              title={`Difficulty: ${metadata.difficulty}`}
+                            >
+                              <span className="text-yellow-400">{getDifficultyStars(metadata.difficulty)}</span>
+                              <span className="text-yellow-300 text-xs capitalize">{metadata.difficulty}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Ingredients */}
+                        <p className="text-white mb-3 text-sm line-clamp-2 flex-shrink-0">
+                          <span className="font-medium">Ingredients:</span> {recipe.ingredients?.map((ingredient) => ingredient.name).join(", ") || "No ingredients listed"}
+                        </p>
+
+                        {/* Missing Ingredients Display */}
+                        <div className="flex-1 min-h-[4rem]">
+                          {!hasAllIngredients && missingIngredients.length > 0 && (
+                            <div className="p-2 bg-gunmetal-400/50 rounded-lg">
+                              <h4 className="text-orange-400 text-xs font-medium mb-1">Missing:</h4>
+                              <div className="flex items-center gap-1 overflow-hidden">
+                                {missingIngredients.slice(0, 2).map((ingredient, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2 py-1 bg-red-500/20 text-red-400 rounded-full text-xs border border-red-500/30 whitespace-nowrap flex-shrink-0"
+                                  >
+                                    {ingredient}
+                                  </span>
+                                ))}
+                                {missingIngredients.length > 2 && (
+                                  <span className="text-gray-400 text-xs px-2 py-1 flex-shrink-0">
+                                    +{missingIngredients.length - 2} more
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons - Always at bottom */}
+                      <div className="flex gap-2 mt-4 pt-3 border-t border-gunmetal-400/30">
+                        <button
+                          onClick={() => openModal(recipe)}
+                          className="flex-1 px-3 py-2 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 text-sm font-medium hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300"
+                        >
+                          View Recipe
+                        </button>
+                        {!hasAllIngredients && (
+                          <button
+                            onClick={() => addMissingIngredientsToShoppingList(recipe)}
+                            disabled={isAddingToShoppingList}
+                            className="px-3 py-2 rounded-full border-2 border-blue-400 bg-gunmetal-400 text-blue-400 text-sm font-medium hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-colors disabled:opacity-50"
+                            title="Add missing ingredients to shopping list"
+                          >
+                            🛒
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </SpotlightCard>
+                );
+              })}
             </div>
             
             {/* Show All Recipes Button */}
@@ -750,9 +978,54 @@ function Searchbar() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-start mb-4">
-                <h2 className="text-xl font-bold text-spring-green-400">
-                  {selectedRecipe.name}
-                </h2>
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold text-spring-green-400 mb-3">
+                    {selectedRecipe.name}
+                  </h2>
+                  
+                  {/* Recipe Info in Modal */}
+                  <div className="flex flex-wrap items-center gap-3 mb-4">
+                    {(() => {
+                      const metadata = getRecipeMetadata(selectedRecipe);
+                      return (
+                        <>
+                          {/* Nationality */}
+                          {metadata.nationality && (
+                            <div 
+                              className="flex items-center gap-2 bg-gunmetal-400/50 px-3 py-2 rounded-full cursor-help hover:bg-gunmetal-400/70 transition-colors"
+                              title={`Cuisine: ${metadata.nationality}`}
+                            >
+                              <span className="text-xl">{getCountryFlag(metadata.nationality)}</span>
+                              <span className="text-gray-300 text-sm capitalize font-medium">{metadata.nationality}</span>
+                            </div>
+                          )}
+                          
+                          {/* Cooking Time */}
+                          {metadata.cookingTime && (
+                            <div 
+                              className="flex items-center gap-2 bg-blue-500/20 px-3 py-2 rounded-full"
+                              title={`Cooking time: ${formatCookingTime(metadata.cookingTime)}`}
+                            >
+                              <span className="text-lg">🕐</span>
+                              <span className="text-blue-300 text-sm font-medium">{formatCookingTime(metadata.cookingTime)}</span>
+                            </div>
+                          )}
+                          
+                          {/* Difficulty */}
+                          {metadata.difficulty && (
+                            <div 
+                              className="flex items-center gap-2 bg-yellow-500/20 px-3 py-2 rounded-full cursor-help hover:bg-yellow-500/30 transition-colors"
+                              title={`Difficulty Level: ${metadata.difficulty}`}
+                            >
+                              <span className="text-yellow-400 text-lg">{getDifficultyStars(metadata.difficulty)}</span>
+                              <span className="text-yellow-300 text-sm capitalize font-medium">{metadata.difficulty}</span>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
               </div>
               
               <div className="flex flex-col gap-4">
@@ -919,29 +1192,139 @@ function Searchbar() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {recipes.map((recipe, idx) => (
-                <SpotlightCard
-                  key={recipe.id ? `${recipe.id}-${idx}` : idx}
-                  className="custom-spotlight-card"
-                  spotlightColor="rgba(0, 229, 255, 0.2)"
-                >
-                  <div
-                    className="bg-gunmetal-400 border-2 border-office-green-500 rounded-lg p-4 h-40 flex flex-col justify-between cursor-pointer hover:bg-emerald-500/20 transition-colors"
-                    onClick={() => {
-                      setShowAllRecipes(false);
-                      openModal(recipe);
-                    }}
+              {recipes.map((recipe, idx) => {
+                const missingIngredients = getMissingIngredients(recipe);
+                const hasAllIngredients = missingIngredients.length === 0;
+                const metadata = getRecipeMetadata(recipe);
+                
+                return (
+                  <SpotlightCard
+                    key={recipe.id ? `${recipe.id}-${idx}` : idx}
+                    className="custom-spotlight-card"
+                    spotlightColor="rgba(0, 229, 255, 0.2)"
                   >
-                    <h3 className="text-lg font-bold text-spring-green-400 mb-2">
-                      {recipe.name}
-                    </h3>
-                    <p className="text-white text-sm">
-                      Ingredients:{" "}
-                      {recipe.ingredients.map((ingredient) => ingredient.name).join(", ")}
-                    </p>
-                  </div>
-                </SpotlightCard>
-              ))}
+                    <div className="bg-gunmetal-400 border-2 border-office-green-500 rounded-lg p-4 h-80 flex flex-col cursor-pointer hover:bg-emerald-500/20 transition-colors">
+                      <div className="flex-1 flex flex-col">
+                        {/* Header */}
+                        <div className="flex justify-between items-start mb-3">
+                          <h3 
+                            className="text-lg font-bold text-spring-green-400 flex-1 line-clamp-2 min-h-[3.5rem]"
+                            onClick={() => {
+                              setShowAllRecipes(false);
+                              openModal(recipe);
+                            }}
+                          >
+                            {recipe.name}
+                          </h3>
+                          <div className="ml-2 flex-shrink-0">
+                            {hasAllIngredients ? (
+                              <span className="text-green-400 text-xs font-medium bg-green-500/20 px-2 py-1 rounded-full whitespace-nowrap">
+                                ✓
+                              </span>
+                            ) : (
+                              <span className="text-orange-400 text-xs font-medium bg-orange-500/20 px-2 py-1 rounded-full whitespace-nowrap">
+                                {missingIngredients.length}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Recipe Metadata Row */}
+                        <div className="flex items-center gap-2 mb-3 text-xs flex-wrap min-h-[2rem]">
+                          {/* Nationality */}
+                          {metadata.nationality && (
+                            <div 
+                              className="flex items-center gap-1 bg-gunmetal-500/50 px-2 py-1 rounded-full cursor-help hover:bg-gunmetal-500/70 transition-colors"
+                              title={`Cuisine: ${metadata.nationality}`}
+                            >
+                              <span className="text-sm">{getCountryFlag(metadata.nationality)}</span>
+                              <span className="text-gray-300 text-xs capitalize">{metadata.nationality}</span>
+                            </div>
+                          )}
+                          
+                          {/* Cooking Time */}
+                          {metadata.cookingTime && (
+                            <div 
+                              className="flex items-center gap-1 bg-blue-500/20 px-2 py-1 rounded-full"
+                              title={`Cooking time: ${formatCookingTime(metadata.cookingTime)}`}
+                            >
+                              <span className="text-sm">🕐</span>
+                              <span className="text-blue-300 text-xs">{formatCookingTime(metadata.cookingTime)}</span>
+                            </div>
+                          )}
+                          
+                          {/* Difficulty */}
+                          {metadata.difficulty && (
+                            <div 
+                              className="flex items-center gap-1 bg-yellow-500/20 px-2 py-1 rounded-full cursor-help hover:bg-yellow-500/30 transition-colors"
+                              title={`Difficulty: ${metadata.difficulty}`}
+                            >
+                              <span className="text-yellow-400 text-sm">{getDifficultyStars(metadata.difficulty)}</span>
+                              <span className="text-yellow-300 text-xs capitalize">{metadata.difficulty}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Ingredients */}
+                        <p className="text-white text-sm line-clamp-2 mb-3">
+                          <span className="font-medium">Ingredients:</span> {recipe.ingredients?.map((ingredient) => ingredient.name).join(", ") || "No ingredients listed"}
+                        </p>
+
+                        {/* Missing Ingredients */}
+                        <div className="flex-1 min-h-[3rem]">
+                          {!hasAllIngredients && missingIngredients.length > 0 && (
+                            <div className="p-2 bg-gunmetal-500/50 rounded-lg">
+                              <h4 className="text-orange-400 text-xs font-medium mb-1">Missing:</h4>
+                              <div className="flex items-center gap-1 overflow-hidden">
+                                {missingIngredients.slice(0, 2).map((ingredient, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2 py-1 bg-red-500/20 text-red-400 rounded-full text-xs border border-red-500/30 whitespace-nowrap flex-shrink-0"
+                                  >
+                                    {ingredient}
+                                  </span>
+                                ))}
+                                {missingIngredients.length > 2 && (
+                                  <span className="text-gray-400 text-xs px-2 py-1 flex-shrink-0">
+                                    +{missingIngredients.length - 2} more
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 mt-4 pt-3 border-t border-gunmetal-500/30">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowAllRecipes(false);
+                            openModal(recipe);
+                          }}
+                          className="flex-1 px-3 py-2 rounded-full border-2 border-spring-green-400 bg-gunmetal-500 text-spring-green-400 text-xs font-medium hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300"
+                        >
+                          View
+                        </button>
+                        {!hasAllIngredients && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addMissingIngredientsToShoppingList(recipe);
+                            }}
+                            disabled={isAddingToShoppingList}
+                            className="px-3 py-2 rounded-full border-2 border-blue-400 bg-gunmetal-500 text-blue-400 text-xs font-medium hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-colors disabled:opacity-50"
+                            title="Add missing ingredients to shopping list"
+                          >
+                            🛒
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </SpotlightCard>
+                );
+              })}
             </div>
           </div>
         </div>
