@@ -34,6 +34,12 @@ function Searchbar() {
   const [dietFilterDebounce, setDietFilterDebounce] = useState(false);
   const recipesPerPage = 4;
 
+  // Shopping list state
+  const [shoppingList, setShoppingList] = useState([]);
+  const [showShoppingList, setShowShoppingList] = useState(false);
+  const [storageIngredients, setStorageIngredients] = useState([]);
+  const [isAddingToShoppingList, setIsAddingToShoppingList] = useState(false);
+
   // Handle diet filter toggle with debounce
   const handleDietFilterToggle = (checked) => {
     setDietFilterDebounce(true);
@@ -423,6 +429,96 @@ function Searchbar() {
     }
   }
 
+  // Fetch user's storage ingredients
+  const fetchStorageIngredients = async () => {
+    try {
+      const res = await api.get("/api/ingredients/");
+      const ingredients = res.data.map(i => i.name.toLowerCase());
+      setStorageIngredients(ingredients);
+      return ingredients;
+    } catch (error) {
+      console.error("Error fetching storage ingredients:", error);
+      return [];
+    }
+  };
+
+  // Load storage ingredients on mount
+  useEffect(() => {
+    fetchStorageIngredients();
+  }, []);
+
+  // Get missing ingredients from a recipe
+  const getMissingIngredients = (recipe) => {
+    const recipeIngredients = recipe.ingredients.map(ing => ing.name.toLowerCase());
+    return recipeIngredients.filter(ingredient => 
+      !storageIngredients.includes(ingredient)
+    );
+  };
+
+  // Add missing ingredients to shopping list
+  const addMissingIngredientsToShoppingList = async (recipe) => {
+    setIsAddingToShoppingList(true);
+    try {
+      const missingIngredients = getMissingIngredients(recipe);
+      
+      if (missingIngredients.length === 0) {
+        addAlert("You have all ingredients for this recipe!");
+        return;
+      }
+
+      // Add ingredients to shopping list, avoiding duplicates
+      const newIngredients = missingIngredients.filter(ingredient => 
+        !shoppingList.some(item => item.name.toLowerCase() === ingredient)
+      );
+
+      if (newIngredients.length === 0) {
+        addAlert("All missing ingredients are already in your shopping list!");
+        return;
+      }
+
+      const shoppingListItems = newIngredients.map(ingredient => ({
+        id: Date.now() + Math.random(),
+        name: ingredient,
+        recipe: recipe.name,
+        completed: false
+      }));
+
+      setShoppingList(prev => [...prev, ...shoppingListItems]);
+      addAlert(`Added ${newIngredients.length} ingredients to shopping list!`);
+    } catch (error) {
+      console.error("Error adding to shopping list:", error);
+      addAlert("Failed to add ingredients to shopping list.");
+    } finally {
+      setIsAddingToShoppingList(false);
+    }
+  };
+
+  // Remove item from shopping list
+  const removeFromShoppingList = (itemId) => {
+    setShoppingList(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  // Toggle shopping list item completion
+  const toggleShoppingListItem = (itemId) => {
+    setShoppingList(prev => 
+      prev.map(item => 
+        item.id === itemId 
+          ? { ...item, completed: !item.completed }
+          : item
+      )
+    );
+  };
+
+  // Clear completed items from shopping list
+  const clearCompletedItems = () => {
+    setShoppingList(prev => prev.filter(item => !item.completed));
+  };
+
+  // Clear entire shopping list
+  const clearShoppingList = () => {
+    setShoppingList([]);
+  };
+
   return (
     <div className="bg-gunmetal-500/0">
       <div className="">
@@ -570,12 +666,25 @@ function Searchbar() {
 
         {/* Search Button */}
         <div className="flex justify-center mt-4 px-5 mb-6">
-          <button
-            onClick={handleSearch}
-            className="w-full max-w-md px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
-          >
-            Search Recipes
-          </button>
+          <div className="w-full max-w-md flex gap-2">
+            <button
+              onClick={handleSearch}
+              className="flex-1 px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
+            >
+              Search Recipes
+            </button>
+            <button
+              onClick={() => setShowShoppingList(true)}
+              className="px-4 py-3 rounded-full border-2 border-blue-400 bg-gunmetal-400 text-blue-400 font-bold hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-all duration-300 shadow-lg hover:shadow-blue-500/20 relative"
+            >
+              🛒
+              {shoppingList.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {shoppingList.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -679,6 +788,13 @@ function Searchbar() {
 
               <div className="flex justify-between mt-6">
                 <button
+                  onClick={() => addMissingIngredientsToShoppingList(selectedRecipe)}
+                  disabled={isAddingToShoppingList}
+                  className="px-4 py-2 rounded-full border-2 border-blue-400 bg-gunmetal-400 text-blue-400 hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-colors disabled:opacity-50"
+                >
+                  {isAddingToShoppingList ? 'Adding...' : 'Add to Shopping List'}
+                </button>
+                <button
                   onClick={() => setShowAddMealModal(true)}
                   className="px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors"
                 >
@@ -691,6 +807,28 @@ function Searchbar() {
                   Close
                 </button>
               </div>
+
+              {/* Show missing ingredients */}
+              {selectedRecipe && (
+                <div className="mt-4 p-3 bg-gunmetal-400/30 rounded-lg">
+                  <h4 className="text-blue-400 font-medium mb-2">Missing Ingredients:</h4>
+                  {getMissingIngredients(selectedRecipe).length === 0 ? (
+                    <p className="text-green-400 text-sm">✓ You have all ingredients!</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {getMissingIngredients(selectedRecipe).map((ingredient, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-1 bg-red-500/20 text-red-400 rounded-full text-sm border border-red-500/30"
+                        >
+                          {ingredient}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           </SpotlightCard>
         </div>
@@ -806,6 +944,92 @@ function Searchbar() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Shopping List Modal */}
+      {showShoppingList && (
+        <div
+          className="fixed inset-0 bg-gunmetal-500/80 backdrop-blur-sm flex justify-center items-center z-50"
+          onClick={() => setShowShoppingList(false)}
+        >
+          <SpotlightCard>
+            <div
+              className="bg-gunmetal-300 rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[70vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-blue-400">
+                  Shopping List ({shoppingList.length})
+                </h2>
+                <button
+                  onClick={() => setShowShoppingList(false)}
+                  className="text-white hover:text-blue-400 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              
+              {shoppingList.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-400 mb-4">Your shopping list is empty</p>
+                  <p className="text-sm text-gray-500">Add ingredients from recipes to get started!</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                    {shoppingList.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`flex items-center justify-between p-3 rounded-lg border-2 ${
+                          item.completed 
+                            ? 'bg-green-500/20 border-green-500/30' 
+                            : 'bg-gunmetal-400/50 border-office-green-500/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={item.completed}
+                            onChange={() => toggleShoppingListItem(item.id)}
+                            className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 flex-shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-medium truncate ${item.completed ? 'line-through text-gray-400' : 'text-white'}`}>
+                              {item.name}
+                            </p>
+                            <p className="text-xs text-gray-400 truncate">From: {item.recipe}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeFromShoppingList(item.id)}
+                          className="text-red-400 hover:text-red-300 font-bold text-lg ml-2 flex-shrink-0"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="flex justify-center gap-4">
+                    <button
+                      onClick={clearCompletedItems}
+                      disabled={!shoppingList.some(item => item.completed)}
+                      className="px-4 py-2 rounded-full border-2 border-green-400 bg-gunmetal-400 text-green-400 hover:bg-green-500 hover:text-white hover:border-green-500 transition-colors disabled:opacity-50"
+                    >
+                      Clear Completed
+                    </button>
+                    <button
+                      onClick={clearShoppingList}
+                      className="px-4 py-2 rounded-full border-2 border-red-400 bg-gunmetal-400 text-red-400 hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </SpotlightCard>
         </div>
       )}
     </div>

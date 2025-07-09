@@ -201,6 +201,21 @@ function Storage() {
     }
   }
 
+  // Add missing ingredients from recipe to shopping list
+  const handleAddToShoppingList = async (recipeId, recipeName) => {
+    try {
+      const response = await api.post(`/api/recipes/${recipeId}/add_missing_ingredients_to_shopping_list/`)
+      
+      if (response.data.added && response.data.added.length > 0) {
+        addAlert(`Added ${response.data.added.length} ingredients from "${recipeName}" to shopping list!`)
+      } else {
+        addAlert(response.data.detail || "All ingredients already in your storage!")
+      }
+    } catch (error) {
+      addAlert("Failed to add ingredients to shopping list.")
+    }
+  }
+
   const addAlert = (message) => {
     const id = Date.now()
     setAlerts((prev) => [...prev, { id, message, visible: true }])
