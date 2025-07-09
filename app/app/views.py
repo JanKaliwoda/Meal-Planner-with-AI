@@ -331,6 +331,7 @@ class IngredientViewSet(viewsets.ModelViewSet):
         name = request.data.get("name")
         quantity = request.data.get("quantity", 1)
         expiration_date = request.data.get("expiration_date")
+        notes = request.data.get("notes", "")
         
         if not name:
             return Response({"error": "No ingredient name provided."}, status=400)
@@ -340,16 +341,19 @@ class IngredientViewSet(viewsets.ModelViewSet):
         except IngredientAllData.DoesNotExist:
             return Response({"error": "Ingredient does not exist."}, status=404)
         
-        ingredient, created = Ingredient.objects.get_or_create(
-            user=request.user, name=base.name,
-            defaults={"quantity": quantity, "expiration_date": expiration_date}
-        )
+        # Always create a new ingredient entry (allow multiple of same ingredient)
+        ingredient_data = {
+            "user": request.user,
+            "name": base.name,
+            "quantity": quantity,
+            "expiration_date": expiration_date,
+            "notes": notes
+        }
         
-        if not created:
-            ingredient.quantity += int(quantity)
-            if expiration_date:
-                ingredient.expiration_date = expiration_date
-            ingredient.save()
+        # Remove None values
+        ingredient_data = {k: v for k, v in ingredient_data.items() if v is not None}
+        
+        ingredient = Ingredient.objects.create(**ingredient_data)
         
         return Response(IngredientSerializer(ingredient).data)
 

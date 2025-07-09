@@ -33,6 +33,7 @@ class Ingredient(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ingredients')
     is_available = models.BooleanField(default=True)
     expiration_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.name} ({self.quantity})"

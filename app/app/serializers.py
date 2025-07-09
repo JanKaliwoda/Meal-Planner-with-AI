@@ -76,7 +76,8 @@ class IngredientSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ingredient
-        fields = ["id", "name", "quantity", "is_available", "user", 'expiration_date']
+        fields = ["id", "name", "quantity", "is_available", "user", 'expiration_date', 'notes']
+
 
 class IngredientAllDataSerializer(serializers.ModelSerializer):
     class Meta:
