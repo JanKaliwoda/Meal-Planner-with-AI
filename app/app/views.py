@@ -36,10 +36,12 @@ from .serializers import (
     UserProfileSerializer,
     IngredientSerializer,
     RecipeSerializer,
+    RecipeCategorizationSerializer,
     MealSerializer,
     ShoppingListSerializer,
     ShoppingListItemSerializer,
 )
+from django.utils import timezone
 
 
 # =====================================
@@ -582,6 +584,109 @@ class RecipeViewSet(viewsets.ModelViewSet):
             "detail": f"Added {len(added_items)} missing ingredients to your shopping list."
         })
 
+    @action(detail=True, methods=['post'])
+    def categorize(self, request, pk=None):
+        """Manually categorize a recipe"""
+        recipe = self.get_object()
+        serializer = RecipeCategorizationSerializer(recipe, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save(categorized_at=timezone.now())
+            return Response({
+                'message': 'Recipe categorized successfully',
+                'categorization': serializer.data
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def categorized(self, request):
+        """Get all categorized recipes with filtering"""
+        queryset = self.get_queryset().filter(
+            cuisine_type__isnull=False,
+            difficulty__isnull=False,
+            cooking_time__isnull=False
+        )
+        
+        # Filter by categorization fields
+        cuisine_type = request.query_params.get('cuisine_type')
+        difficulty = request.query_params.get('difficulty')
+        cooking_time = request.query_params.get('cooking_time')
+        tags = request.query_params.get('tags')
+        
+        if cuisine_type:
+            queryset = queryset.filter(cuisine_type=cuisine_type)
+        if difficulty:
+            queryset = queryset.filter(difficulty=difficulty)
+        if cooking_time:
+            queryset = queryset.filter(cooking_time=cooking_time)
+        if tags:
+            tag_list = tags.split(',')
+            for tag in tag_list:
+                queryset = queryset.filter(tags__contains=[tag.strip()])
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def category_stats(self, request):
+        """Get categorization statistics"""
+        total_recipes = self.get_queryset().count()
+        categorized_recipes = self.get_queryset().filter(
+            cuisine_type__isnull=False,
+            difficulty__isnull=False,
+            cooking_time__isnull=False
+        ).count()
+        
+        # Get distribution stats
+        cuisine_stats = self.get_queryset().exclude(
+            cuisine_type__isnull=True
+        ).values('cuisine_type').annotate(count=Count('id')).order_by('-count')
+        
+        difficulty_stats = self.get_queryset().exclude(
+            difficulty__isnull=True
+        ).values('difficulty').annotate(count=Count('id')).order_by('-count')
+        
+        cooking_time_stats = self.get_queryset().exclude(
+            cooking_time__isnull=True
+        ).values('cooking_time').annotate(count=Count('id')).order_by('-count')
+        
+        return Response({
+            'total_recipes': total_recipes,
+            'categorized_recipes': categorized_recipes,
+            'categorization_percentage': round((categorized_recipes / total_recipes) * 100, 2) if total_recipes > 0 else 0,
+            'cuisine_distribution': list(cuisine_stats),
+            'difficulty_distribution': list(difficulty_stats),
+            'cooking_time_distribution': list(cooking_time_stats)
+        })
+    
+    @action(detail=False, methods=['get'])
+    def filter_options(self, request):
+        """Get available filter options for categorization"""
+        return Response({
+            'cuisine_types': [choice[0] for choice in Recipe._meta.get_field('cuisine_type').choices],
+            'difficulties': [choice[0] for choice in Recipe._meta.get_field('difficulty').choices],
+            'cooking_times': [choice[0] for choice in Recipe._meta.get_field('cooking_time').choices],
+            'popular_tags': self.get_popular_tags()
+        })
+    
+    def get_popular_tags(self):
+        """Get most popular tags from categorized recipes"""
+        from collections import Counter
+        
+        recipes_with_tags = self.get_queryset().exclude(tags=[])
+        all_tags = []
+        
+        for recipe in recipes_with_tags:
+            all_tags.extend(recipe.tags)
+        
+        tag_counts = Counter(all_tags)
+        return [tag for tag, count in tag_counts.most_common(20)]
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -649,9 +754,6 @@ class RecipeSearchView(APIView):
         if not ingredient_names or not isinstance(ingredient_names, list):
             return Response({"error": "A list of ingredients is required."}, status=400)
 
-        # Remove this entire allergen filtering section for ingredients
-        # Users should be able to search with any ingredient
-        
         # Ensure all ingredients exist in IngredientAllData
         ingredients_qs = IngredientAllData.objects.filter(name__in=ingredient_names)
         ingredients = list(ingredients_qs.values_list('name', flat=True))
@@ -669,6 +771,7 @@ class RecipeSearchView(APIView):
         ).order_by('name').distinct()
 
         # Apply user dietary preferences and allergen filtering if authenticated
+        # BUT skip allergen filtering for ingredients the user is explicitly searching for
         if request.user.is_authenticated:
             try:
                 user_profile = UserProfile.objects.get(user=request.user)
@@ -681,14 +784,21 @@ class RecipeSearchView(APIView):
                     )
                 
                 # Exclude recipes that contain user's allergens using comprehensive filtering
+                # BUT allow the ingredients they're explicitly searching for
                 if user_profile.allergies.exists():
                     user_allergen_names = get_user_allergen_filters(request.user)
                     if user_allergen_names:
+                        # Get the searched ingredient names in lowercase for comparison
+                        searched_ingredients_lower = [name.lower() for name in ingredients]
+                        
                         # Filter out recipes with unsafe ingredients with exceptions
                         safe_recipes = []
                         for recipe in matching_recipes:
                             recipe_safe = True
                             for ingredient in recipe.ingredients.all():
+                                # Skip allergen check for ingredients the user is explicitly searching for
+                                if ingredient.name.lower() in searched_ingredients_lower:
+                                    continue
                                 if not is_ingredient_safe_from_allergens(ingredient.name, user_allergen_names):
                                     recipe_safe = False
                                     break
@@ -697,17 +807,24 @@ class RecipeSearchView(APIView):
                         
                         matching_recipes = matching_recipes.filter(id__in=safe_recipes)
                         
-                        # Also exclude by contains_allergens relationship
+                        # Also exclude by contains_allergens relationship, but allow searched ingredients
                         user_allergens = user_profile.allergies.all()
-                        matching_recipes = matching_recipes.exclude(contains_allergens__in=user_allergens)
+                        # Don't exclude recipes based on allergens if the user is explicitly searching for those allergens
+                        allergen_names_lower = [allergy.name.lower() for allergy in user_allergens]
+                        conflicting_allergens = []
+                        for allergen in user_allergens:
+                            if allergen.name.lower() not in searched_ingredients_lower:
+                                conflicting_allergens.append(allergen)
+                        
+                        if conflicting_allergens:
+                            matching_recipes = matching_recipes.exclude(contains_allergens__in=conflicting_allergens)
                 
             except UserProfile.DoesNotExist:
                 pass
 
         # Return the matching recipes
         return Response(RecipeSerializer(matching_recipes, many=True).data)
-
-
+    
 # =====================================
 # MEAL PLANNING
 # =====================================

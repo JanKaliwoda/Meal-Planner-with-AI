@@ -64,8 +64,87 @@ class Recipe(models.Model):
     contains_allergens = models.ManyToManyField(Allergy, blank=True, related_name='recipes')
     suitable_for_diets = models.ManyToManyField(DietaryPreference, blank=True, related_name='recipes')
 
+    # Add categorization fields
+    cuisine_type = models.CharField(
+        max_length=50,
+        choices=[
+            ('Italian', 'Italian'),
+            ('Mexican', 'Mexican'),
+            ('Asian', 'Asian'),
+            ('American', 'American'),
+            ('Mediterranean', 'Mediterranean'),
+            ('Indian', 'Indian'),
+            ('Thai', 'Thai'),
+            ('Chinese', 'Chinese'),
+            ('French', 'French'),
+            ('Greek', 'Greek'),
+            ('Middle Eastern', 'Middle Eastern'),
+            ('Japanese', 'Japanese'),
+            ('Korean', 'Korean'),
+            ('Spanish', 'Spanish'),
+            ('British', 'British'),
+            ('German', 'German'),
+            ('Other', 'Other'),
+        ],
+        null=True,
+        blank=True,
+        help_text="Cuisine type of the recipe"
+    )
+    
+    difficulty = models.CharField(
+        max_length=20,
+        choices=[
+            ('Easy', 'Easy'),
+            ('Medium', 'Medium'),
+            ('Hard', 'Hard'),
+        ],
+        null=True,
+        blank=True,
+        help_text="Difficulty level of the recipe"
+    )
+    
+    cooking_time = models.CharField(
+        max_length=30,
+        choices=[
+            ('Under 30 mins', 'Under 30 mins'),
+            ('30-60 mins', '30-60 mins'),
+            ('1-2 hours', '1-2 hours'),
+            ('Over 2 hours', 'Over 2 hours'),
+        ],
+        null=True,
+        blank=True,
+        help_text="Estimated cooking time"
+    )
+    
+    tags = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Tags for the recipe (vegetarian, spicy, healthy, etc.)"
+    )
+    
+    # Add timestamp for when categorization was done
+    categorized_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the recipe was categorized"
+    )
+
     def __str__(self):
         return self.name
+    
+    def is_categorized(self):
+        """Check if recipe has been categorized"""
+        return all([
+            self.cuisine_type,
+            self.difficulty,
+            self.cooking_time
+        ])
+    
+    def get_category_display(self):
+        """Get formatted category display"""
+        if self.is_categorized():
+            return f"{self.cuisine_type} • {self.difficulty} • {self.cooking_time}"
+        return "Not categorized"
     
 class Meal(models.Model):
     """A planned meal with a specific recipe at a specific time"""

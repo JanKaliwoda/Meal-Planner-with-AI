@@ -73,9 +73,18 @@ class IngredientAllDataAdmin(admin.ModelAdmin):
 
 @admin.register(models.Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    list_display = ["name", "created_by", "created_by_ai", "get_ingredients"]
+    list_display = ["name", "created_by", "created_by_ai", "get_ingredients", "cuisine_type", "difficulty", "cooking_time"]
     search_fields = ["name", "description", "steps", "ingredients__name"]
     filter_horizontal = ["ingredients"]
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'description', 'steps')
+        }),
+        ('Categorization', {
+            'fields': ('cuisine_type', 'difficulty', 'cooking_time', 'tags')
+        }),
+    )
 
     def get_ingredients(self, obj):
         return ", ".join([ing.name for ing in obj.ingredients.all()])
