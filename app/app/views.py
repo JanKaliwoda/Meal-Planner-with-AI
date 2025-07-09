@@ -848,6 +848,7 @@ class MealViewSet(viewsets.ModelViewSet):
         return Meal.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
+        # Allow creation without date/meal_type (for meal templates)
         serializer.save(user=self.request.user)
 
     @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated])

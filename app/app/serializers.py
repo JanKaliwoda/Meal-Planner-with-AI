@@ -159,6 +159,10 @@ class MealSerializer(serializers.ModelSerializer):
     class Meta:
         model = Meal
         fields = ["id", "user", "date", "meal_type", "recipe", "recipe_id"]
+        extra_kwargs = {
+            'date': {'required': False, 'allow_null': True},
+            'meal_type': {'required': False, 'allow_null': True},
+        }
 
 
 class ShoppingListItemSerializer(serializers.ModelSerializer):

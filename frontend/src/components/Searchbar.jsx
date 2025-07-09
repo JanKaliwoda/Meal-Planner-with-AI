@@ -309,46 +309,44 @@ function Searchbar() {
 
   // Search recipes by storage ingredients
   const handleStorageSearch = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get("/api/ingredients/");
-      const storageIngredients = res.data.map(i => i.name);
-      if (storageIngredients.length === 0) {
-        addAlert("You have no ingredients in storage!");
-        setLoading(false);
-        return;
-      }
-      
-      // Filter out allergens from storage ingredients
-      const safeStorageIngredients = storageIngredients.filter(ingredient => 
-        !userAllergens.includes(ingredient.toLowerCase())
-      );
-      
-      if (safeStorageIngredients.length === 0) {
-        addAlert("All your storage ingredients are allergens!");
-        setLoading(false);
-        return;
-      }
-      
-      setSelectedIngredients(safeStorageIngredients);
-      setSearchInput("");
-      setHasSearched(true);
-      setCurrentPage(1);
-      const response = await api.post("/api/recipe-search/", {
-        ingredients: safeStorageIngredients,
-      });
-      const filtered = filterRecipesByAllergens(response.data);
-      setRecipes(filtered);
-      if (response.data.length > 0 && filtered.length === 0) {
-        addAlert("All found recipes contained your allergens and were filtered out.");
-      }
-    } catch (error) {
-      addAlert("Failed to fetch your storage ingredients.");
-      console.error(error);
-    } finally {
+  setLoading(true);
+  try {
+    const res = await api.get("/api/ingredients/");
+    const storageIngredients = res.data.map(i => i.name);
+    if (storageIngredients.length === 0) {
+      addAlert("You have no ingredients in storage!");
       setLoading(false);
+      return;
     }
-  };
+    
+    // Filter out allergens from storage ingredients
+    const safeStorageIngredients = storageIngredients.filter(ingredient => 
+      !userAllergens.includes(ingredient.toLowerCase())
+    );
+    
+    if (safeStorageIngredients.length === 0) {
+      addAlert("All your storage ingredients are allergens!");
+      setLoading(false);
+      return;
+    }
+    
+    // Add storage ingredients to existing selected ingredients instead of replacing
+    setSelectedIngredients(prev => {
+      const combined = [...new Set([...prev, ...safeStorageIngredients])];
+      return combined;
+    });
+    
+    setSearchInput("");
+    // Don't auto-search - let user manually search
+    addAlert(`Added ${safeStorageIngredients.length} ingredients from your storage!`);
+    
+  } catch (error) {
+    addAlert("Failed to fetch your storage ingredients.");
+    console.error(error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const addAlert = (message) => {
     const id = Date.now()
@@ -377,23 +375,8 @@ function Searchbar() {
     setIsModalOpen(false)
   }
 
-  // Pagination logic
-  const totalPages = Math.ceil(recipes.length / recipesPerPage)
-  const paginatedRecipes = recipes.slice(
-    (currentPage - 1) * recipesPerPage,
-    currentPage * recipesPerPage
-  )
-
-  const handlePrevPage = () => {
-    setCurrentPage((prev) => Math.max(prev - 1, 1))
-  }
-
-  const handleNextPage = () => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-  }
-
   // Add function to handle meal creation
-  const handleAddMeal = async () => {
+  const handleSaveRecipe = async () => {
     setIsAddingMeal(true)
     try {
       const token = localStorage.getItem(ACCESS_TOKEN)
@@ -402,10 +385,9 @@ function Searchbar() {
         return
       }
 
+      // Only send recipe_id (and is_template if your backend expects it)
       const response = await api.post('/api/meals/', {
         recipe_id: selectedRecipe.id,
-        date: selectedDate.toISOString().split('T')[0],
-        meal_type: selectedMealType
       }, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -413,21 +395,21 @@ function Searchbar() {
       })
 
       if (response.status === 201) {
-        setShowAddMealModal(false)
-        alert('Meal added successfully!')
+        addAlert('Recipe saved to My Meals! Check the Calendar sidebar to schedule it.')
       }
     } catch (error) {
       if (error.response?.status === 401) {
         localStorage.removeItem(ACCESS_TOKEN)
         navigate('/login')
       } else {
-        console.error('Error adding meal:', error)
-        alert('Failed to add meal')
+        console.error('Error saving recipe:', error)
+        addAlert('Failed to save recipe')
       }
     } finally {
       setIsAddingMeal(false)
     }
   }
+
 
   // Fetch user's storage ingredients
   const fetchStorageIngredients = async () => {
@@ -833,7 +815,7 @@ const formatCookingTime = (time) => {
                     className="custom-spotlight-card"
                     spotlightColor="rgba(0, 229, 255, 0.2)"
                   >
-                    <div className="bg-gunmetal-300 border-2 border-office-green-500 rounded-lg p-4 h-80 flex flex-col">
+                    <div className="bg-gunmetal-300 border-2 border-office-green-500 rounded-lg p-4 h-90 flex flex-col">
                       <div className="flex-1 flex flex-col">
                         {/* Header with title and status */}
                         <div className="flex justify-between items-start mb-3">
@@ -1033,28 +1015,149 @@ const formatCookingTime = (time) => {
                 <div className="bg-gunmetal-400/50 rounded-lg p-4">
                   <h3 className="text-spring-green-400 font-medium mb-2">Ingredients</h3>
                   <div className="max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-office-green-500 scrollbar-track-gunmetal-400">
-                    <ul className="list-disc list-inside">
-                      {selectedRecipe.description
-                        ? selectedRecipe.description
-                            .replace(/[\[\]"]+/g, "")
-                            .split(",")
-                            .map((ing, idx) => <li key={idx}>{ing.trim()}</li>)
-                        : <li>No ingredients listed.</li>}
+                    <ul className="list-disc list-inside space-y-1">
+                      {(() => {
+                        // Parse ingredients from the description field which contains the full ingredient strings with proportions
+                        try {
+                          let ingredientsList = [];
+                          
+                          // First try to get ingredients from the description field
+                          if (selectedRecipe.description) {
+                            const desc = selectedRecipe.description.trim();
+                            
+                            // Check if description starts with a JSON array pattern
+                            if (desc.startsWith('[') && desc.includes('"')) {
+                              // Clean up the JSON string and parse it
+                              const cleanedDesc = desc
+                                .replace(/^\[/, '') // Remove opening bracket
+                                .replace(/\]$/, '') // Remove closing bracket
+                                .replace(/^"/, '') // Remove leading quote
+                                .replace(/"$/, '') // Remove trailing quote
+                                .replace(/\\"/g, '"') // Unescape quotes
+                                .replace(/", "/g, '|SPLIT|') // Replace separators with a unique marker
+                                .replace(/","/g, '|SPLIT|') // Handle no space variant
+                                .replace(/",$/, '') // Remove trailing quote and comma
+                                .replace(/^"/, ''); // Remove any remaining leading quote
+                              
+                              // Split by our unique marker to get individual ingredients
+                              ingredientsList = cleanedDesc
+                                .split('|SPLIT|')
+                                .map(ingredient => ingredient.replace(/^"|"$/g, '').trim()) // Clean up quotes
+                                .filter(ingredient => ingredient.length > 0 && ingredient !== '""');
+                            }
+                          }
+                          
+                          // Fallback: try using the ingredients array if available
+                          if (ingredientsList.length === 0 && selectedRecipe.ingredients && selectedRecipe.ingredients.length > 0) {
+                            ingredientsList = selectedRecipe.ingredients.map(ingredient => {
+                              if (typeof ingredient === 'string') {
+                                return ingredient;
+                              }
+                              // Try to construct from object properties
+                              const quantity = ingredient.quantity || '';
+                              const name = ingredient.name || '';
+                              const preparation = ingredient.preparation || '';
+                              return `${quantity} ${name} ${preparation}`.trim();
+                            });
+                          }
+                          
+                          // If we have ingredients, display them
+                          if (ingredientsList.length > 0) {
+                            return ingredientsList.map((ingredient, idx) => (
+                              <li key={idx} className="text-white">
+                                {ingredient}
+                              </li>
+                            ));
+                          }
+                          
+                          return <li className="text-white">No ingredients available.</li>;
+                        } catch (error) {
+                          console.error('Error parsing ingredients:', error);
+                          // Final fallback: try to use ingredients array as-is
+                          if (selectedRecipe.ingredients && selectedRecipe.ingredients.length > 0) {
+                            return selectedRecipe.ingredients.map((ingredient, idx) => (
+                              <li key={idx} className="text-white">
+                                {typeof ingredient === 'string' ? ingredient : ingredient.name || 'Unknown ingredient'}
+                              </li>
+                            ));
+                          }
+                          return <li className="text-white">Unable to parse ingredients.</li>;
+                        }
+                      })()}
                     </ul>
                   </div>
                 </div>
 
                 <div className="bg-gunmetal-400/50 rounded-lg p-4">
-                  <h3 className="text-spring-green-400 font-medium mb-2">Steps</h3>
+                  <h3 className="text-spring-green-400 font-medium mb-2">Instructions</h3>
                   <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-office-green-500 scrollbar-track-gunmetal-400">
-                    <div className="whitespace-pre-line">
-                      {selectedRecipe.steps
-                        ? selectedRecipe.steps
-                            .split(/;\s*|\n/)
-                            .filter((line) => line.trim() !== "")
-                            .map((line, idx) => <div key={idx}>{line.trim()}</div>)
-                        : "No description available."}
-                    </div>
+                    {(() => {
+                      // Parse directions from the directions field
+                      try {
+                        let directionsList = [];
+                        
+                        // Try to get directions from the directions field (similar to ingredients parsing)
+                        if (selectedRecipe.directions) {
+                          const dirs = selectedRecipe.directions.trim();
+                          
+                          // Check if directions starts with a JSON array pattern
+                          if (dirs.startsWith('[') && dirs.includes('"')) {
+                            // Clean up the JSON string and parse it
+                            const cleanedDirs = dirs
+                              .replace(/^\[/, '') // Remove opening bracket
+                              .replace(/\]$/, '') // Remove closing bracket
+                              .replace(/^"/, '') // Remove leading quote
+                              .replace(/"$/, '') // Remove trailing quote
+                              .replace(/\\"/g, '"') // Unescape quotes
+                              .replace(/", "/g, '|SPLIT|') // Replace separators with a unique marker
+                              .replace(/","/g, '|SPLIT|') // Handle no space variant
+                              .replace(/",$/, '') // Remove trailing quote and comma
+                              .replace(/^"/, ''); // Remove any remaining leading quote
+                            
+                            // Split by our unique marker to get individual steps
+                            directionsList = cleanedDirs
+                              .split('|SPLIT|')
+                              .map(direction => direction.replace(/^"|"$/g, '').trim()) // Clean up quotes
+                              .filter(direction => direction.length > 0 && direction !== '""');
+                          }
+                        }
+                        
+                        // Fallback: try using the steps field
+                        if (directionsList.length === 0 && selectedRecipe.steps) {
+                          if (typeof selectedRecipe.steps === 'string') {
+                            // Split by sentence boundaries but keep complete sentences
+                            directionsList = selectedRecipe.steps
+                              .split(/(?<=[.!?])\s+(?=[A-Z])|(?<=\.)\s*\d+\.\s*/)
+                              .filter(step => step.trim().length > 10);
+                          } else if (Array.isArray(selectedRecipe.steps)) {
+                            directionsList = selectedRecipe.steps;
+                          }
+                        }
+                        
+                        // Display the directions
+                        if (directionsList.length > 0) {
+                          return (
+                            <div className="space-y-3">
+                              {directionsList.map((direction, idx) => (
+                                <div key={idx} className="flex gap-3">
+                                  <span className="flex-shrink-0 w-6 h-6 bg-emerald-500 text-white text-sm font-bold rounded-full flex items-center justify-center">
+                                    {idx + 1}
+                                  </span>
+                                  <div className="text-white leading-relaxed">
+                                    {direction.replace(/^\d+\.\s*/, '').trim()}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }
+                        
+                        return <div className="text-white">No instructions available.</div>;
+                      } catch (error) {
+                        console.error('Error parsing directions:', error);
+                        return <div className="text-white">Unable to parse instructions.</div>;
+                      }
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1068,10 +1171,11 @@ const formatCookingTime = (time) => {
                   {isAddingToShoppingList ? 'Adding...' : 'Add to Shopping List'}
                 </button>
                 <button
-                  onClick={() => setShowAddMealModal(true)}
-                  className="px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors"
+                  onClick={handleSaveRecipe}
+                  disabled={isAddingMeal}
+                  className="px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors disabled:opacity-50"
                 >
-                  Add Recipe
+                  {isAddingMeal ? 'Saving...' : 'Save Recipe'}
                 </button>
                 <button
                   onClick={closeModal}
@@ -1104,68 +1208,6 @@ const formatCookingTime = (time) => {
 
             </div>
           </SpotlightCard>
-        </div>
-      )}
-
-      {/* Add Meal Modal */}
-      {showAddMealModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
-          onClick={() => setShowAddMealModal(false)}
-        >
-          <div
-            className="bg-gunmetal-300 rounded-lg shadow-xl p-6 max-w-md w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-xl font-bold text-spring-green-400 mb-4">
-              Add Recipe to Calendar
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-spring-green-400 text-sm font-bold mb-2">
-                  Select Date
-                </label>
-                <DatePicker
-                  selected={selectedDate}
-                  onChange={(date) => setSelectedDate(date)}
-                  className="w-full px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white"
-                  dateFormat="yyyy-MM-dd"
-                />
-              </div>
-
-              <div>
-                <label className="block text-spring-green-400 text-sm font-bold mb-2">
-                  Select Meal Type
-                </label>
-                <select
-                  value={selectedMealType}
-                  onChange={(e) => setSelectedMealType(e.target.value)}
-                  className="w-full px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white"
-                >
-                  <option value="breakfast">Breakfast</option>
-                  <option value="lunch">Lunch</option>
-                  <option value="dinner">Dinner</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-4 mt-6">
-              <button
-                onClick={() => setShowAddMealModal(false)}
-                className="px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddMeal}
-                disabled={isAddingMeal}
-                className="px-4 py-2 rounded-full border-2 border-office-green-500 bg-gunmetal-400 text-white hover:bg-emerald-500 hover:border-emerald-500 transition-colors disabled:opacity-50"
-              >
-                {isAddingMeal ? 'Adding...' : 'Add to Calendar'}
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

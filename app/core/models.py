@@ -150,10 +150,12 @@ class Meal(models.Model):
     """A planned meal with a specific recipe at a specific time"""
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
-    date = models.DateField()
+    date = models.DateField(null=True, blank=True)
     meal_type = models.CharField(
         max_length=50,
-        choices=[('breakfast', 'Breakfast'), ('lunch', 'Lunch'), ('dinner', 'Dinner')]
+        choices=[('breakfast', 'Breakfast'), ('lunch', 'Lunch'), ('dinner', 'Dinner')],
+        null=True,
+        blank=True
     )
 
     def __str__(self):
