@@ -8,7 +8,7 @@ from rest_framework import generics, viewsets, filters as drf_filters, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
-from django.db.models import Q, Count
+from django.db.models import Q, Count, F
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -770,60 +770,78 @@ class RecipeSearchView(APIView):
             matching_count=len(ingredients)  # Only recipes with ALL ingredients
         ).order_by('name').distinct()
 
-        # Apply user dietary preferences and allergen filtering if authenticated
-        # BUT skip allergen filtering for ingredients the user is explicitly searching for
+        # Apply dietary preference filtering (from request or user profile) using suitable_for_diets
+        diet_value = request.data.get('diet')
+        diet_obj = None
+        if diet_value:
+            try:
+                # Accept both integer (ID) and string (name)
+                if isinstance(diet_value, int) or (isinstance(diet_value, str) and str(diet_value).isdigit()):
+                    diet_obj = DietaryPreference.objects.get(id=int(diet_value))
+                else:
+                    diet_obj = DietaryPreference.objects.get(name__iexact=str(diet_value))
+                matching_recipes = matching_recipes.filter(suitable_for_diets=diet_obj)
+            except DietaryPreference.DoesNotExist:
+                matching_recipes = matching_recipes.none()
+        elif request.user.is_authenticated:
+            try:
+                user_profile = UserProfile.objects.get(user=request.user)
+                if user_profile.dietary_preference:
+                    diet_obj = user_profile.dietary_preference
+                    matching_recipes = matching_recipes.filter(suitable_for_diets=diet_obj)
+            except UserProfile.DoesNotExist:
+                pass
+
+        
+        # 2. Allergen filtering (only for authenticated users)
         if request.user.is_authenticated:
             try:
                 user_profile = UserProfile.objects.get(user=request.user)
-                
-                # Filter by dietary preference - make it more permissive
-                if user_profile.dietary_preference:
-                    matching_recipes = matching_recipes.filter(
-                        Q(suitable_for_diets=user_profile.dietary_preference) |
-                        Q(suitable_for_diets__isnull=True)
-                    )
-                
-                # Exclude recipes that contain user's allergens using comprehensive filtering
-                # BUT allow the ingredients they're explicitly searching for
                 if user_profile.allergies.exists():
                     user_allergen_names = get_user_allergen_filters(request.user)
                     if user_allergen_names:
                         # Get the searched ingredient names in lowercase for comparison
                         searched_ingredients_lower = [name.lower() for name in ingredients]
-                        
-                        # Filter out recipes with unsafe ingredients with exceptions
-                        safe_recipes = []
-                        for recipe in matching_recipes:
-                            recipe_safe = True
-                            for ingredient in recipe.ingredients.all():
-                                # Skip allergen check for ingredients the user is explicitly searching for
-                                if ingredient.name.lower() in searched_ingredients_lower:
-                                    continue
-                                if not is_ingredient_safe_from_allergens(ingredient.name, user_allergen_names):
-                                    recipe_safe = False
-                                    break
-                            if recipe_safe:
-                                safe_recipes.append(recipe.id)
-                        
-                        matching_recipes = matching_recipes.filter(id__in=safe_recipes)
-                        
+                        # Build Q objects to exclude recipes with unsafe ingredients, except searched ones
+                        # First, get all unsafe ingredient names except searched ones
+                        unsafe_ingredient_names = [name for name in user_allergen_names if name not in searched_ingredients_lower]
+                        if unsafe_ingredient_names:
+                            matching_recipes = matching_recipes.exclude(
+                                ingredients__name__in=unsafe_ingredient_names
+                            )
                         # Also exclude by contains_allergens relationship, but allow searched ingredients
                         user_allergens = user_profile.allergies.all()
-                        # Don't exclude recipes based on allergens if the user is explicitly searching for those allergens
                         allergen_names_lower = [allergy.name.lower() for allergy in user_allergens]
-                        conflicting_allergens = []
-                        for allergen in user_allergens:
-                            if allergen.name.lower() not in searched_ingredients_lower:
-                                conflicting_allergens.append(allergen)
-                        
+                        conflicting_allergens = [allergen for allergen in user_allergens if allergen.name.lower() not in searched_ingredients_lower]
                         if conflicting_allergens:
                             matching_recipes = matching_recipes.exclude(contains_allergens__in=conflicting_allergens)
-                
             except UserProfile.DoesNotExist:
                 pass
 
-        # Return the matching recipes
-        return Response(RecipeSerializer(matching_recipes, many=True).data)
+        # Pagination: get limit and offset from query params
+        try:
+            limit = int(request.query_params.get('limit', 50))
+            offset = int(request.query_params.get('offset', 0))
+        except Exception:
+            limit = 50
+            offset = 0
+
+        # Calculate total_count BEFORE slicing for pagination
+        total_count = matching_recipes.count() if hasattr(matching_recipes, 'count') else len(matching_recipes)
+        # If matching_recipes is a queryset, slice it; if it's a list, slice as list
+        if hasattr(matching_recipes, 'all') or hasattr(matching_recipes, 'count'):
+            recipes_page = matching_recipes[offset:offset+limit]
+        else:
+            recipes_page = matching_recipes[offset:offset+limit] if isinstance(matching_recipes, list) else []
+        serializer = RecipeSerializer(recipes_page, many=True)
+
+        return Response({
+            'results': serializer.data,
+            'total_count': total_count,
+            'offset': offset,
+            'limit': limit,
+            'has_more': (offset + limit) < total_count
+        })
     
 # =====================================
 # MEAL PLANNING

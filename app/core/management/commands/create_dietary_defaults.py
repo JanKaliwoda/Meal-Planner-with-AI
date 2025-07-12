@@ -6,24 +6,13 @@ class Command(BaseCommand):
     help = 'Create default dietary preferences and allergies'
 
     def handle(self, *args, **kwargs):
-        # Default dietary preferences
-        dietary_preferences = [
-            'Vegetarian',
-            'Vegan',
-            'Gluten-Free',
-            'Dairy-Free',
-            'Keto',
-            'Paleo',
-            'Low-Carb',
-            'Mediterranean',
-            'Pescatarian',
-            'Raw Food',
-            'Whole30',
-            'Low-Fat',
-            'High-Protein',
-            'Diabetic-Friendly',
-            'Heart-Healthy'
-        ]
+        # Default dietary preferences from ingredient_map.csv
+        import csv
+        dietary_preferences = []
+        with open('resources/ingredient_map.csv', newline='', encoding='utf-8') as csvfile:
+            reader = csv.reader(csvfile)
+            header = next(reader)
+            dietary_preferences = header[1:]  # skip 'ingredient' column
 
         # 100 most common allergic products (all lowercase for matching)
         # Top 20 most common allergens for quick selection (4 rows of 5)

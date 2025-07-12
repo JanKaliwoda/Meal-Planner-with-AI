@@ -113,55 +113,57 @@ class Command(BaseCommand):
             deleted_count = Recipe.objects.count()
             Recipe.objects.all().delete()
             self.stdout.write(self.style.SUCCESS(f'Deleted {deleted_count} existing recipes.'))
-        
+
         created_count = 0
         updated_count = 0
         skipped_count = 0
         missing_ingredients_stats = {}  # Track missing ingredients and their counts
-        
+
+        # Get all diets and build allowed ingredient sets for each
+        from core.models import DietaryPreference
+        all_diets = list(DietaryPreference.objects.all())
+        diet_allowed_ingredients = {
+            diet.id: set(IngredientAllData.objects.filter(dietary_preferences=diet).values_list('id', flat=True))
+            for diet in all_diets
+        }
+
         try:
             with open('resources/test_dataset.csv', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
-                
-                # Limit to first 1000 recipes for testing
+
                 for row_num, row in enumerate(reader, start=1):
-                    if row_num > 28000:  # Stop after 1000 recipes
-                        self.stdout.write(self.style.SUCCESS(f'Reached 5000 recipe limit, stopping...'))
+                    if row_num > 50202:
+                        self.stdout.write(self.style.SUCCESS(f'Reached 100 recipe limit, stopping...'))
                         break
-                        
+
                     try:
                         name = row['title'].strip()
                         if not name:
                             self.stdout.write(self.style.WARNING(f'Row {row_num}: Empty recipe name, skipping'))
                             skipped_count += 1
                             continue
-                            
+
                         description = row['ingredients']
                         steps = "\n".join(ast.literal_eval(row['directions']))
                         ingredient_names = ast.literal_eval(row['NER'])
-                        
-                        # Check if ALL ingredients exist in the database first (with normalization)
+
                         ingredient_objs = []
                         missing_ingredients = []
-                        
+
                         for ing_name in ingredient_names:
-                            if ing_name.strip():  # Only process non-empty ingredient names
-                                # Try to find ingredient with normalization
+                            if ing_name.strip():
                                 ing = self.find_ingredient_by_name(ing_name.strip())
                                 if ing:
                                     ingredient_objs.append(ing)
                                 else:
-                                    # Track missing ingredients
                                     missing_ingredients.append(ing_name.strip())
-                        
-                        # Only create recipe if ALL ingredients exist
+
                         if missing_ingredients:
-                            # Track missing ingredients for statistics
                             for missing_ing in missing_ingredients:
                                 if missing_ing not in missing_ingredients_stats:
                                     missing_ingredients_stats[missing_ing] = 0
                                 missing_ingredients_stats[missing_ing] += 1
-                            
+
                             self.stdout.write(
                                 self.style.WARNING(
                                     f'Row {row_num}: Skipping recipe "{name}" - missing ingredients: {missing_ingredients[:5]}...'
@@ -169,7 +171,7 @@ class Command(BaseCommand):
                             )
                             skipped_count += 1
                             continue
-                        
+
                         # All ingredients exist, safe to create recipe
                         recipe, created = Recipe.objects.get_or_create(
                             name=name,
@@ -179,36 +181,43 @@ class Command(BaseCommand):
                                 'created_by_ai': False,
                             }
                         )
-                        
+
                         # Link all ingredients to the recipe
                         recipe.ingredients.set(ingredient_objs)
+
+                        # --- Assign suitable diets ---
+                        ingredient_ids = set(ing.id for ing in ingredient_objs)
+                        suitable_diet_ids = [diet.id for diet in all_diets if ingredient_ids.issubset(diet_allowed_ingredients[diet.id])]
+                        if suitable_diet_ids:
+                            recipe.suitable_for_diets.set(suitable_diet_ids)
+                        else:
+                            recipe.suitable_for_diets.clear()
+
                         recipe.save()
 
-                        # Count and log progress
                         if created:
                             created_count += 1
                             status = "Added"
                         else:
                             updated_count += 1
                             status = "Updated"
-                            
+
                         if row_num % 100 == 0:
                             self.stdout.write(f'Processed {row_num} recipes...')
-                            
+
                     except Exception as e:
                         self.stdout.write(
                             self.style.WARNING(f'Error processing row {row_num}: {e}')
                         )
                         skipped_count += 1
                         continue
-                        
+
         except FileNotFoundError:
             self.stdout.write(
                 self.style.ERROR('File resources/test_dataset.csv not found')
             )
             return
 
-        # Summary
         self.stdout.write(
             self.style.SUCCESS(
                 f'\nImport completed!\n'
@@ -217,25 +226,23 @@ class Command(BaseCommand):
                 f'Skipped: {skipped_count} (missing ingredients)'
             )
         )
-        
-        # Statistics for missing ingredients
+
         if missing_ingredients_stats:
             self.stdout.write(
                 self.style.WARNING(
                     f'\n=== TOP 10 MISSING INGREDIENTS STATISTICS ===\n'
                 )
             )
-            
-            # Sort by count (descending) and get top 10
+
             sorted_missing = sorted(missing_ingredients_stats.items(), key=lambda x: x[1], reverse=True)[:10]
-            
+
             for i, (ingredient, count) in enumerate(sorted_missing, 1):
                 self.stdout.write(
                     self.style.WARNING(
                         f'{i:2d}. "{ingredient}" - missing in {count} recipes'
                     )
                 )
-            
+
             self.stdout.write(
                 self.style.WARNING(
                     f'\nTotal unique missing ingredients: {len(missing_ingredients_stats)}'

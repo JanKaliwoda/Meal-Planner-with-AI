@@ -8,10 +8,6 @@ import api from "../api"
 
 export default function Calendar() {  // Changed from Home() to Calendar()
   const [isLoaded, setIsLoaded] = useState(false)
-  const [showAIPopup, setShowAIPopup] = useState(false)
-  const [typedText, setTypedText] = useState("")
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentView, setCurrentView] = useState("month")
   const [currentMonth, setCurrentMonth] = useState("")
   const [currentDate, setCurrentDate] = useState("")
   const [currentDateObj, setCurrentDateObj] = useState(new Date())

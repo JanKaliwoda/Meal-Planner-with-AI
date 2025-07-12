@@ -80,9 +80,10 @@ class IngredientSerializer(serializers.ModelSerializer):
 
 
 class IngredientAllDataSerializer(serializers.ModelSerializer):
+    suitable_for_diets = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
     class Meta:
         model = IngredientAllData
-        fields = ["id", "name"]
+        fields = ["id", "name", "suitable_for_diets"]
 
 
 class RecipeSerializer(serializers.ModelSerializer):
@@ -101,12 +102,13 @@ class RecipeSerializer(serializers.ModelSerializer):
     is_categorized = serializers.SerializerMethodField()
     category_display = serializers.SerializerMethodField()
 
+    suitable_for_diets = DietaryPreferenceSerializer(many=True, read_only=True)
     class Meta:
         model = Recipe
         fields = [
             "id", "name", "description", "steps", "ingredients", "created_by", 
             "created_by_ai", "cuisine_type", "difficulty", "cooking_time", 
-            "tags", "categorized_at", "is_categorized", "category_display"
+            "tags", "categorized_at", "is_categorized", "category_display", "suitable_for_diets"
         ]
     
     def get_is_categorized(self, obj):

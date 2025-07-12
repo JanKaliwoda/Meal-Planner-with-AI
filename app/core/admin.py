@@ -19,7 +19,13 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(models.IngredientAllData)
 class IngredientAllDataAdmin(admin.ModelAdmin):
-    list_display = ["name", "get_allergens", "get_dietary_preferences", "recipe_count"]
+    list_display = ["name", "get_allergens", "get_dietary_preferences", "get_suitable_for_diets", "recipe_count"]
+    def get_suitable_for_diets(self, obj):
+        diets = obj.dietary_preferences.all()
+        if diets:
+            return ", ".join([diet.name for diet in diets])
+        return "None"
+    get_suitable_for_diets.short_description = "Suitable for Diets"
     list_filter = ["contains_allergens", "dietary_preferences"]
     search_fields = ["name"]
     ordering = ["name"]
@@ -73,7 +79,13 @@ class IngredientAllDataAdmin(admin.ModelAdmin):
 
 @admin.register(models.Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    list_display = ["name", "created_by", "created_by_ai", "get_ingredients", "cuisine_type", "difficulty", "cooking_time"]
+    list_display = ["name", "get_ingredients", "get_suitable_for_diets", "cuisine_type", "difficulty", "cooking_time"]
+    def get_suitable_for_diets(self, obj):
+        diets = obj.suitable_for_diets.all()
+        if diets:
+            return ", ".join([diet.name for diet in diets])
+        return "None"
+    get_suitable_for_diets.short_description = "Suitable for Diets"
     search_fields = ["name", "description", "steps", "ingredients__name"]
     filter_horizontal = ["ingredients"]
 

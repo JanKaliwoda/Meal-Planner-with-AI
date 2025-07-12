@@ -32,7 +32,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--limit',
             type=int,
-            default=100,
+            default=10515,
             help='Limit number of recipes to categorize (default: 100)',
         )
         parser.add_argument(

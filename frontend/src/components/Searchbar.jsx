@@ -2,12 +2,15 @@ import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ACCESS_TOKEN } from "../constants"
 import api from "../api"
-import DatePicker from "react-datepicker"
 import "react-datepicker/dist/react-datepicker.css"
 import "../assets/layered-waves-haikei.svg"
 import SpotlightCard from "./SpotlightCard"
 
 function Searchbar() {
+  // Pagination state for recipes
+  const [recipeOffset, setRecipeOffset] = useState(0);
+  const [recipeTotalCount, setRecipeTotalCount] = useState(0);
+  const [recipeHasMore, setRecipeHasMore] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [recipes, setRecipes] = useState([]);
@@ -20,10 +23,7 @@ function Searchbar() {
   const [dynamicIngredients, setDynamicIngredients] = useState([]);
   const [filteredIngredients, setFilteredIngredients] = useState([]);
   const [showNoIngredientsMessage, setShowNoIngredientsMessage] = useState(false);
-  const [showAddMealModal, setShowAddMealModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [isAddingMeal, setIsAddingMeal] = useState(false);
-  const [selectedMealType, setSelectedMealType] = useState('dinner');
   const [userAllergens, setUserAllergens] = useState([]);
   const [selectedAllergens, setSelectedAllergens] = useState([]);
   const [showAllRecipes, setShowAllRecipes] = useState(false);
@@ -32,7 +32,6 @@ function Searchbar() {
   const [useDietFilter, setUseDietFilter] = useState(false);
   const [isLoadingIngredients, setIsLoadingIngredients] = useState(false);
   const [dietFilterDebounce, setDietFilterDebounce] = useState(false);
-  const recipesPerPage = 4;
 
   // Shopping list state
   const [shoppingList, setShoppingList] = useState([]);
@@ -109,7 +108,31 @@ function Searchbar() {
         console.error("Error fetching all ingredients:", error);
       }
     };
+            {/* Show More Recipes Button in All Recipes modal */}
+            {recipeHasMore && (
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={loadMoreRecipes}
+                  className="px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
+                  disabled={loading}
+                >
+                  Show 50 More
+                </button>
+              </div>
+            )}
     fetchAllIngredients();
+            {/* Show More Recipes Button in All Recipes modal */}
+            {recipeHasMore && (
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={loadMoreRecipes}
+                  className="px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
+                  disabled={loading}
+                >
+                  Show 50 More
+                </button>
+              </div>
+            )}
   }, [useDietFilter]); // Re-fetch when diet filter changes
 
   // Fetch ingredients from API when searchInput changes
@@ -264,15 +287,12 @@ function Searchbar() {
     }
   }
 
-  // Helper: filter recipes by user allergens (frontend double-check)
+  // Helper: filter recipes by user allergens only (diet filtering is now backend)
   const filterRecipesByAllergens = (recipesList) => {
     if (!userAllergens.length) return recipesList;
     return recipesList.filter(recipe => {
-      // Check ingredients
       const ingredientNames = (recipe.ingredients || []).map(i => i.name?.toLowerCase?.() || "");
-      // Check contains_allergens field if present
       const containsAllergens = (recipe.contains_allergens || []).map(a => a.name?.toLowerCase?.() || "");
-      // If any allergen is present, filter out
       return !userAllergens.some(allergen =>
         ingredientNames.some(ing => ing.includes(allergen)) ||
         containsAllergens.some(ca => ca.includes(allergen))
@@ -284,6 +304,7 @@ function Searchbar() {
     setHasSearched(true);
     if (e) e.preventDefault();
     setCurrentPage(1);
+    setRecipeOffset(0);
     if (selectedIngredients.length === 0) {
       addAlert("Please select at least one ingredient!");
       return;
@@ -291,17 +312,52 @@ function Searchbar() {
 
     setLoading(true);
     try {
-      const response = await api.post("/api/recipe-search/", {
+      // Only send selected ingredients and diet, never allAvailableIngredients
+      const requestBody = {
         ingredients: selectedIngredients,
-      });
-      const filtered = filterRecipesByAllergens(response.data);
+      };
+      if (useDietFilter && userDietaryPreference) {
+        requestBody.diet = userDietaryPreference;
+      }
+      // Always fetch first 50 recipes only
+      const response = await api.post(`/api/recipe-search/?limit=50&offset=0`, requestBody);
+      const data = response.data;
+      const filtered = filterRecipesByAllergens(data.results);
       setRecipes(filtered);
-      if (response.data.length > 0 && filtered.length === 0) {
+      setRecipeTotalCount(data.total_count || filtered.length);
+      setRecipeHasMore(data.has_more || false);
+      setRecipeOffset(50);
+      if (data.results.length > 0 && filtered.length === 0) {
         addAlert("All found recipes contained your allergens and were filtered out.");
       }
     } catch (error) {
       console.error("Error fetching recipes:", error);
       alert("Failed to fetch recipes. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load more recipes (pagination)
+  const loadMoreRecipes = async () => {
+    setLoading(true);
+    try {
+      const requestBody = {
+        ingredients: selectedIngredients,
+      };
+      if (useDietFilter && userDietaryPreference) {
+        requestBody.diet = userDietaryPreference;
+      }
+      const response = await api.post(`/api/recipe-search/?limit=50&offset=${recipeOffset}`, requestBody);
+      const data = response.data;
+      const filtered = filterRecipesByAllergens(data.results);
+      setRecipes(prev => [...prev, ...filtered]);
+      setRecipeTotalCount(data.total_count || (recipes.length + filtered.length));
+      setRecipeHasMore(data.has_more || false);
+      setRecipeOffset(recipeOffset + 50);
+    } catch (error) {
+      console.error("Error loading more recipes:", error);
+      alert("Failed to load more recipes.");
     } finally {
       setLoading(false);
     }
@@ -642,53 +698,50 @@ const formatCookingTime = (time) => {
           </div>
         ))}
 
-        {/* Searchbar */}
-        <form className="max-w-md mx-auto pt-10">
-          <label
-            htmlFor="default-search"
-            className="mb-2 text-sm font-medium text-gray-900 sr-only dark:text-white"
+        {/* Searchbar row with Filter by My Diet button on the left */}
+        <div className="flex items-center justify-center pt-10 gap-4 max-w-xl mx-auto">
+          <button
+            type="button"
+            onClick={() => handleDietFilterToggle(!useDietFilter)}
+            className={`px-4 py-2 rounded-full border-2 font-bold transition-colors duration-200 shadow-lg focus:outline-none ${
+              useDietFilter
+                ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600 hover:border-emerald-600"
+                : "border-office-green-500 bg-gunmetal-400 text-office-green-500 hover:bg-emerald-500/20 hover:text-emerald-500"
+            }`}
+            style={{ fontSize: "0.95rem" }}
+            title="Filter recipes and ingredients by your dietary preference"
           >
-            Search
-          </label>
-          <div className="relative flex items-center">
-            <input
-              type="search"
-              id="default-search"
-              value={searchInput}
-              autoComplete="off"
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="block w-full p-4 ps-5 placeholder-office-green-600 text-sm text-spring-green-500 border-2 border-office-green-500 rounded-full bg-gray-50/0 focus:ring-emerald-500 focus:border-spring-green-500 [&::-webkit-search-cancel-button]:appearance-none"
-              placeholder="Search Ingredients..."
-            />
-            <button
-              type="button"
-              onClick={handleStorageSearch}
-              className="ml-2 px-3 py-2 rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition-colors text-xs absolute right-2 top-1/2 -translate-y-1/2"
-              style={{ fontSize: "0.85rem" }}
-              title="Search recipes with your storage"
+            {useDietFilter ? "✓ Filter by My Diet" : "Filter by My Diet"}
+          </button>
+          <form className="flex-1">
+            <label
+              htmlFor="default-search"
+              className="mb-2 text-sm font-medium text-gray-900 sr-only dark:text-white"
             >
-              My Storage
-            </button>
-          </div>
-        </form>
-
-        {/* Diet Filter Toggle */}
-        {userDietaryPreference && (
-          <div className="max-w-md mx-auto mt-4 flex items-center justify-center">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={useDietFilter}
-                onChange={(e) => handleDietFilterToggle(e.target.checked)}
-                disabled={dietFilterDebounce}
-                className="w-4 h-4 text-emerald-600 bg-gray-100 border-gray-300 rounded focus:ring-emerald-500 focus:ring-2"
-              />
-              <span className="text-sm font-medium text-spring-green-500">
-                Filter by my diet preferences
-              </span>
+              Search
             </label>
-          </div>
-        )}
+            <div className="relative flex items-center">
+              <input
+                type="search"
+                id="default-search"
+                value={searchInput}
+                autoComplete="off"
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="block w-full p-4 ps-5 placeholder-office-green-600 text-sm text-spring-green-500 border-2 border-office-green-500 rounded-full bg-gray-50/0 focus:ring-emerald-500 focus:border-spring-green-500 [&::-webkit-search-cancel-button]:appearance-none"
+                placeholder="Search Ingredients..."
+              />
+              <button
+                type="button"
+                onClick={handleStorageSearch}
+                className="ml-2 px-3 py-2 rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition-colors text-xs absolute right-2 top-1/2 -translate-y-1/2"
+                style={{ fontSize: "0.85rem" }}
+                title="Search recipes with your storage"
+              >
+                My Storage
+              </button>
+            </div>
+          </form>
+        </div>
 
         {/* Ingredient Tiles */}
         <div className="p-5">
@@ -808,7 +861,6 @@ const formatCookingTime = (time) => {
                 const missingIngredients = getMissingIngredients(recipe);
                 const hasAllIngredients = missingIngredients.length === 0;
                 const metadata = getRecipeMetadata(recipe);
-                
                 return (
                   <SpotlightCard
                     key={recipe.id ? `${recipe.id}-${idx}` : idx}
@@ -928,15 +980,14 @@ const formatCookingTime = (time) => {
                 );
               })}
             </div>
-            
-            {/* Show All Recipes Button */}
+            {/* Show All Recipes Button (opens modal) */}
             {recipes.length > 3 && (
               <div className="flex justify-center mt-6">
                 <button
                   onClick={() => setShowAllRecipes(true)}
                   className="px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
                 >
-                  Show All {recipes.length} Recipes
+                  Show All Recipes
                 </button>
               </div>
             )}
@@ -1223,7 +1274,7 @@ const formatCookingTime = (time) => {
           >
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-spring-green-400">
-                All Recipes ({recipes.length})
+                All Recipes
               </h2>
               <button
                 onClick={() => setShowAllRecipes(false)}
@@ -1368,6 +1419,18 @@ const formatCookingTime = (time) => {
                 );
               })}
             </div>
+            {/* Show 50 More button at the end of the scrollable popup */}
+            {recipeHasMore && (
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={loadMoreRecipes}
+                  className="px-6 py-3 rounded-full border-2 border-spring-green-400 bg-gunmetal-400 text-spring-green-400 font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
+                  disabled={loading}
+                >
+                  Show 50 More
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
