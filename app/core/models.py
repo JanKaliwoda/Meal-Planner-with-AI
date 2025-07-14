@@ -1,19 +1,16 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-
 
 class DietaryPreference(models.Model):
     """User's dietary lifestyle (e.g., vegan, keto)"""
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.name
 
 class Allergy(models.Model):
     """Known allergies a user might have"""
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, unique=True)
     def __str__(self):
         return self.name
     
@@ -159,7 +156,10 @@ class Meal(models.Model):
     )
 
     def __str__(self):
-        return f"{self.meal_type.title()} on {self.date} - {self.recipe.name}"
+        meal_type = self.meal_type.title() if self.meal_type else "Meal"
+        date = self.date if self.date else "No date"
+        recipe_name = self.recipe.name if self.recipe else "No recipe"
+        return f"{meal_type} on {date} - {recipe_name}"
     
 class ShoppingList(models.Model):
     """A generated shopping list based on selected recipes"""

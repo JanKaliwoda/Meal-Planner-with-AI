@@ -1,6 +1,4 @@
 import re
-import sys
-import os
 
 from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.response import Response
@@ -8,7 +6,7 @@ from rest_framework import generics, viewsets, filters as drf_filters, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
-from django.db.models import Q, Count, F
+from django.db.models import Q, Count
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -45,83 +43,16 @@ from django.utils import timezone
 
 
 # =====================================
-# HELPER FUNCTIONS
+# HELPER FUNCTIONS (imported from helpers.py)
 # =====================================
-
-def normalize_title(title):
-    """Normalize recipe title for comparison"""
-    title = re.sub(r'\(.*?\)', '', title)
-    return title.strip().lower().replace("'", "'").replace("`", "'").replace(""", '"').replace(""", '"')
-
-
-def get_related_allergens(allergen_name):
-    """Get all related allergen names for comprehensive filtering"""
-    allergen_map = {
-        'milk': ['milk', 'dairy', 'lactose', 'casein', 'whey', 'butter', 'cream', 'cheese', 'yogurt', 'sour cream', 'cream cheese', 'ice cream'],
-        'eggs': ['eggs', 'egg', 'egg white', 'egg yolk', 'albumin'],
-        'peanuts': ['peanuts', 'peanut', 'peanut butter', 'groundnut'],
-        'tree nuts': ['almonds', 'walnuts', 'cashews', 'pistachios', 'hazelnuts', 'brazil nuts', 'pecans', 'macadamia nuts', 'pine nuts', 'chestnuts', 'tree nuts'],
-        'soy': ['soy', 'soya', 'soybean', 'tofu', 'tempeh', 'miso', 'soy sauce', 'edamame'],
-        'fish': ['fish', 'salmon', 'tuna', 'cod', 'halibut', 'sardines', 'anchovies', 'mackerel', 'trout'],
-        'shellfish': ['shellfish', 'shrimp', 'crab', 'lobster', 'oysters', 'mussels', 'clams', 'scallops', 'prawns'],
-        'wheat': ['wheat', 'flour', 'bread', 'pasta', 'cereals', 'crackers', 'cookies'],
-        'sesame': ['sesame', 'sesame seeds', 'tahini', 'sesame oil'],
-        'gluten': ['gluten', 'wheat', 'barley', 'rye', 'oats', 'spelt', 'kamut', 'triticale', 'bulgur', 'semolina', 'durum'],
-        'sulphites': ['sulphites', 'sulfites', 'sulfur dioxide', 'sodium sulfite'],
-        'corn': ['corn', 'maize', 'corn starch', 'corn syrup', 'cornmeal'],
-        'mustard': ['mustard', 'mustard seeds', 'dijon mustard'],
-        'celery': ['celery', 'celery seeds', 'celeriac'],
-        'lupin': ['lupin', 'lupine'],
-        'coconut': ['coconut', 'coconut oil', 'coconut milk', 'coconut cream'],
-        'yeast': ['yeast', 'nutritional yeast', 'bakers yeast'],
-        'chocolate': ['chocolate', 'cocoa', 'cacao', 'dark chocolate', 'milk chocolate'],
-        'tomatoes': ['tomatoes', 'tomato', 'tomato sauce', 'ketchup', 'marinara'],
-        'citrus': ['citrus', 'lemon', 'lime', 'orange', 'grapefruit', 'tangerine'],
-    }
-    
-    # Check if the allergen is in our map
-    for key, values in allergen_map.items():
-        if allergen_name.lower() in values:
-            return values
-    
-    # If not found in map, return the allergen itself
-    return [allergen_name.lower()]
-
-
-def get_user_allergen_filters(user):
-    """Get comprehensive allergen filter for a user"""
-    try:
-        user_profile = UserProfile.objects.get(user=user)
-        if user_profile.allergies.exists():
-            all_allergen_names = set()
-            for allergy in user_profile.allergies.all():
-                related_allergens = get_related_allergens(allergy.name)
-                all_allergen_names.update(related_allergens)
-            return list(all_allergen_names)
-    except UserProfile.DoesNotExist:
-        pass
-    return []
-
-
-def is_ingredient_safe_from_allergens(ingredient_name, user_allergen_names):
-    """Check if an ingredient is safe from user's allergens, with exceptions"""
-    ingredient_lower = ingredient_name.lower()
-    
-    # Exception: eggplant should not be filtered out even if "egg" is in allergens
-    if ingredient_lower == 'eggplant':
-        return True
-    
-    if ingredient_lower == "milk chocolate":
-        return True
-    
-    # Check if ingredient contains any allergen names
-    for allergen_name in user_allergen_names:
-        if allergen_name.lower() in ingredient_lower:
-            return False
-    
-    return True
-
-
+from .helpers import (
+    HARD_DIETS,
+    SOFT_DIETS,
+    get_dietary_filter_type,
+    filter_and_prioritize_recipes,
+    get_user_allergen_filters,
+    is_ingredient_safe_from_allergens,
+)
 # =====================================
 # AUTHENTICATION & USER MANAGEMENT
 # =====================================
